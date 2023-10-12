@@ -1,22 +1,51 @@
 #pragma comment(lib, "ws2_32.lib")
 
-#include <WinSock2.h> //Winsock í—¤ë”íŒŒì¼ include. WSADATA ë“¤ì–´ìˆìŒ.
+#include <WinSock2.h> //Winsock Çì´õÆÄÀÏ include. WSADATA µé¾îÀÖÀ½.
 #include <WS2tcpip.h>
 #include <string>
 #include <sstream>
 #include <iostream>
 #include <thread>
+//#include <mysql/jdbc.h>
+#include <Windows.h> // system("cls")¸¦ »ç¿ëÇÏ±â À§ÇÑ Çì´õ
+#include <conio.h> // _getch()¸¦ »ç¿ëÇÏ±â À§ÇÑ Çì´õ 
+#include <mysql/jdbc.h>
 
 #define MAX_SIZE 1024
+#define ENTER 13
+#define UP 72
+#define DOWN 80 // ¾Æ½ºÅ° ÄÚµå Á¤ÀÇ
 
 using std::cout;
 using std::cin;
 using std::endl;
 using std::string;
 
+sql::mysql::MySQL_Driver* driver; // ÃßÈÄ ÇØÁ¦ÇÏÁö ¾Ê¾Æµµ Connector/C++°¡ ÀÚµ¿À¸·Î ÇØÁ¦ÇØ ÁÜ
+sql::Connection* con;
+sql::Statement* stmt;
+sql::PreparedStatement* pstmt;
+sql::ResultSet* result;
+
 SOCKET client_sock;
 string my_nick;
 string name, id, pw, birth;
+
+const string server = "tcp://127.0.0.1:3306"; // µ¥ÀÌÅÍº£ÀÌ½º ÁÖ¼Ò
+const string username = "root"; // µ¥ÀÌÅÍº£ÀÌ½º »ç¿ëÀÚ
+const string password = "goflvhxj"; // µ¥ÀÌÅÍº£ÀÌ½º Á¢¼Ó ºñ¹Ğ¹øÈ£
+
+class user_info {
+public:
+    string u_name, u_id, u_pw, u_birth;
+    user_info(string u_name, string u_id, string u_pw, string u_birth) {
+        this->u_name = u_name;
+        this->u_id = u_id;
+        this->u_pw = u_pw;
+        this->u_birth = u_birth;
+    }
+};
+// ÀÌ¸§ recv ÇÔ¼ö
 int chat_recv() {
     char buf[MAX_SIZE] = { };
     string msg;
@@ -25,10 +54,10 @@ int chat_recv() {
         ZeroMemory(&buf, MAX_SIZE);
         if (recv(client_sock, buf, MAX_SIZE, 0) > 0) {
             msg = buf;
-            std::stringstream ss(msg);  // ë¬¸ìì—´ì„ ìŠ¤íŠ¸ë¦¼í™”
+            std::stringstream ss(msg);  // ¹®ÀÚ¿­À» ½ºÆ®¸²È­
             string user;
-            ss >> user; // ìŠ¤íŠ¸ë¦¼ì„ í†µí•´, ë¬¸ìì—´ì„ ê³µë°± ë¶„ë¦¬í•´ ë³€ìˆ˜ì— í• ë‹¹. ë³´ë‚¸ ì‚¬ëŒì˜ ì´ë¦„ë§Œ userì— ì €ì¥ë¨.
-            if (user != my_nick) cout << buf << endl; // ë‚´ê°€ ë³´ë‚¸ ê²Œ ì•„ë‹ ê²½ìš°ì—ë§Œ ì¶œë ¥í•˜ë„ë¡.
+            ss >> user; // ½ºÆ®¸²À» ÅëÇØ, ¹®ÀÚ¿­À» °ø¹é ºĞ¸®ÇØ º¯¼ö¿¡ ÇÒ´ç. º¸³½ »ç¶÷ÀÇ ÀÌ¸§¸¸ user¿¡ ÀúÀåµÊ.
+            if (user != my_nick) cout << buf << endl; // ³»°¡ º¸³½ °Ô ¾Æ´Ò °æ¿ì¿¡¸¸ Ãâ·ÂÇÏµµ·Ï.
         }
         else {
             cout << "Server Off" << endl;
@@ -36,64 +65,285 @@ int chat_recv() {
         }
     }
 }
+// Ä¿¼­ ±ôºıÀÓ Á¦°Å
+void CursorView(bool show)
+{
+    HANDLE hConsole;
+    CONSOLE_CURSOR_INFO ConsoleCursor;
+    hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+    ConsoleCursor.bVisible = show;
+    ConsoleCursor.dwSize = 1;
+    SetConsoleCursorInfo(hConsole, &ConsoleCursor);
+}
+// ÀÎÅÍÆäÀÌ½º
+void startMenu1()
+{
+    CursorView(false);
+    system("cls");
+    cout << "\n";
+    cout << " "; cout << "********************************************************\n";
+    cout << " "; cout << "*                                                      *\n";
+    cout << " "; cout << "*       * * * *   *     *       *      * * * * *       *\n";
+    cout << " "; cout << "*       *         *     *      * *         *           *\n";
+    cout << " "; cout << "*       *         * * * *     * * *        *           *\n";
+    cout << " "; cout << "*       *         *     *    *     *       *           *\n";
+    cout << " "; cout << "*       * * * *   *     *   *       *      *           *\n";
+    cout << " "; cout << "*                                                      *\n";
+    cout << " "; cout << "*                                                      *\n";
+    cout << " "; cout << "*                    < ½ÃÀÛ È­¸é >                     *\n";
+    cout << " "; cout << "*                                                      *\n";
+    cout << " "; cout << "*                                                      *\n";
+    cout << " "; cout << "*                 ¢º  1. ·Î±×ÀÎ                         *\n";
+    cout << " "; cout << "*                                                      *\n";
+    cout << " "; cout << "*                    2. È¸¿ø°¡ÀÔ                       *\n";
+    cout << " "; cout << "*                                                      *\n";
+    cout << " "; cout << "*                    0. Á¾·á                           *\n";
+    cout << " "; cout << "*                                                      *\n";
+    cout << " "; cout << "********************************************************\n\n";
+}
+void startMenu2()
+{
+    CursorView(false);
+    system("cls");
+    cout << "\n";
+    cout << " "; cout << "********************************************************\n";
+    cout << " "; cout << "*                                                      *\n";
+    cout << " "; cout << "*       * * * *   *     *       *      * * * * *       *\n";
+    cout << " "; cout << "*       *         *     *      * *         *           *\n";
+    cout << " "; cout << "*       *         * * * *     * * *        *           *\n";
+    cout << " "; cout << "*       *         *     *    *     *       *           *\n";
+    cout << " "; cout << "*       * * * *   *     *   *       *      *           *\n";
+    cout << " "; cout << "*                                                      *\n";
+    cout << " "; cout << "*                                                      *\n";
+    cout << " "; cout << "*                    < ½ÃÀÛ È­¸é >                     *\n";
+    cout << " "; cout << "*                                                      *\n";
+    cout << " "; cout << "*                                                      *\n";
+    cout << " "; cout << "*                    1. ·Î±×ÀÎ                         *\n";
+    cout << " "; cout << "*                                                      *\n";
+    cout << " "; cout << "*                 ¢º  2. È¸¿ø°¡ÀÔ                       *\n";
+    cout << " "; cout << "*                                                      *\n";
+    cout << " "; cout << "*                    0. Á¾·á                           *\n";
+    cout << " "; cout << "*                                                      *\n";
+    cout << " "; cout << "********************************************************\n\n";
+}
+void startMenu0()
+{
+    CursorView(false);
+    system("cls");
+    cout << "\n";
+    cout << " "; cout << "********************************************************\n";
+    cout << " "; cout << "*                                                      *\n";
+    cout << " "; cout << "*       * * * *   *     *       *      * * * * *       *\n";
+    cout << " "; cout << "*       *         *     *      * *         *           *\n";
+    cout << " "; cout << "*       *         * * * *     * * *        *           *\n";
+    cout << " "; cout << "*       *         *     *    *     *       *           *\n";
+    cout << " "; cout << "*       * * * *   *     *   *       *      *           *\n";
+    cout << " "; cout << "*                                                      *\n";
+    cout << " "; cout << "*                                                      *\n";
+    cout << " "; cout << "*                    < ½ÃÀÛ È­¸é >                     *\n";
+    cout << " "; cout << "*                                                      *\n";
+    cout << " "; cout << "*                                                      *\n";
+    cout << " "; cout << "*                    1. ·Î±×ÀÎ                         *\n";
+    cout << " "; cout << "*                                                      *\n";
+    cout << " "; cout << "*                    2. È¸¿ø°¡ÀÔ                       *\n";
+    cout << " "; cout << "*                                                      *\n";
+    cout << " "; cout << "*                 ¢º  0. Á¾·á                           *\n";
+    cout << " "; cout << "*                                                      *\n";
+    cout << " "; cout << "********************************************************\n\n";
+}
+void endMenu()
+{
+    CursorView(false);
+    system("cls");
+    cout << "\n";
+    cout << " "; cout << "********************************************************\n";
+    cout << " "; cout << "*                                                      *\n";
+    cout << " "; cout << "*       * * * *   *     *       *      * * * * *       *\n";
+    cout << " "; cout << "*       *         *     *      * *         *           *\n";
+    cout << " "; cout << "*       *         * * * *     * * *        *           *\n";
+    cout << " "; cout << "*       *         *     *    *     *       *           *\n";
+    cout << " "; cout << "*       * * * *   *     *   *       *      *           *\n";
+    cout << " "; cout << "*                                                      *\n";
+    cout << " "; cout << "*                                                      *\n";
+    cout << " "; cout << "*                    <   Á¾ ·á   >                     *\n";
+    cout << " "; cout << "*                                                      *\n";
+    cout << " "; cout << "*                                                      *\n";
+    cout << " "; cout << "*            ¢º  ÇÁ·Î±×·¥À» Á¾·áÇÏ½Ã°Ú½À´Ï±î?           *\n";
+    cout << " "; cout << "*                                                      *\n";
+    cout << " "; cout << "*               (EnterÅ°¸¦ ´©¸£¸é Á¾·á)                *\n";
+    cout << " "; cout << "*                                                      *\n";
+    cout << " "; cout << "*                                                      *\n";
+    cout << " "; cout << "*                                                      *\n";
+    cout << " "; cout << "********************************************************\n\n";
+}
 
+void start_sql()
+{
+    // MySQL Connector/C++ ÃÊ±âÈ­
+    try {
+        driver = sql::mysql::get_mysql_driver_instance();
+        con = driver->connect(server, username, password);
+    }
+    catch (sql::SQLException& e) {
+        cout << "Could not connect to server. Error message: " << e.what() << endl;
+        exit(1);
+    }
+
+    // µ¥ÀÌÅÍº£ÀÌ½º ¼±ÅÃ
+    con->setSchema("chatting");
+
+    // db ÇÑ±Û ÀúÀåÀ» À§ÇÑ ¼ÂÆÃ 
+    stmt = con->createStatement();
+    stmt->execute("set names euckr");
+    if (stmt) { delete stmt; stmt = nullptr; }
+}
+void check_id() {
+    while (1) {
+        cout << "¾ÆÀÌµğ¸¦ ÀÔ·ÂÇÏ¼¼¿ä(¿µ¹®°ú ¼ıÀÚ Æ÷ÇÔ 8ÀÚ¸®·Î ÀÔ·ÂÇÏ¼¼¿ä) : ";
+        cin >> id;
+        pstmt = con->prepareStatement("SELECT id FROM userinfo WHERE id = ?");
+        pstmt->setString(1, id);
+        result = pstmt->executeQuery();
+        if (result->next()) {
+            string db_id = result->getString(1);
+            if (db_id == id) {
+                cout << "Áßº¹µÈ IDÀÔ´Ï´Ù !" << endl;
+                continue;
+                // ¾ÆÀÌµğ°¡ Áßº¹µÊ
+            }
+        }
+        else {
+             // ¾ÆÀÌµğ Áßº¹ ¾øÀ½
+             cout << "ID Ã¼Å©¿Ï·á" << endl;
+             send(client_sock, id.c_str(), 10, 0);
+             break;
+         }
+    }
+}
+// start sql
+void sign_in() {
+
+    cout << "È¸¿ø°¡ÀÔÀ» ½ÃÀÛÇÕ´Ï´Ù" << endl;
+        cout << "ÀÌ¸§À» ÀÔ·ÂÇÏ¼¼¿ä : ";
+        cin >> name;
+        check_id();
+        send(client_sock, name.c_str(), 10, 0); // ¿¬°á¿¡ ¼º°øÇÏ¸é client °¡ ÀÔ·ÂÇÑ ´Ğ³×ÀÓÀ» ¼­¹ö·Î Àü¼Û
+    cout << "ºñ¹Ğ¹øÈ£¸¦ ÀÔ·ÂÇÏ¼¼¿ä : ";
+    cin >> pw;
+    cout << "»ı³â¿ùÀÏÀ» ÀÔ·ÂÇÏ¼¼¿ä : ";
+    cin >> birth;
+    user_info *u  = new user_info(name, id, pw, birth);
+
+    pstmt = con->prepareStatement("INSERT INTO userinfo(name, id, pw, birthday) VALUES(?,?,?,?)");
+
+    pstmt->setString(1, u->u_name);
+    pstmt->setString(2, u->u_id);
+    pstmt->setString(3, u->u_pw);
+    pstmt->setString(4, u->u_birth);
+
+    try {
+        pstmt->execute(); // SQL Äõ¸® ½ÇÇà
+        cout << "User " << u->u_name << " added to the database." << endl;
+    }
+    catch (sql::SQLException& e) {
+        cout << "SQL Error: " << e.what() << endl;
+    }
+   
+
+}
+void log_in() {
+    cout << "·Î±×ÀÎÀ» ½ÃÀÛÇÕ´Ï´Ù!" << endl;
+    cout << "¾ÆÀÌµğ¸¦ ÀÔ·ÂÇÏ¼¼¿ä(¿µ¹®°ú ¼ıÀÚ Æ÷ÇÔ 8ÀÚ¸®·Î ÀÔ·ÂÇÏ¼¼¿ä) : ";
+    cin >> id;
+    cout << "ºñ¹Ğ¹øÈ£¸¦ ÀÔ·ÂÇÏ¼¼¿ä : ";
+    cin >> pw;
+}
 int main() {
-    WSADATA wsa;
-    int num;
-    // Winsockë¥¼ ì´ˆê¸°í™”í•˜ëŠ” í•¨ìˆ˜. MAKEWORD(2, 2)ëŠ” Winsockì˜ 2.2 ë²„ì „ì„ ì‚¬ìš©í•˜ê² ë‹¤ëŠ” ì˜ë¯¸.
-    // ì‹¤í–‰ì— ì„±ê³µí•˜ë©´ 0ì„, ì‹¤íŒ¨í•˜ë©´ ê·¸ ì´ì™¸ì˜ ê°’ì„ ë°˜í™˜.
-    // 0ì„ ë°˜í™˜í–ˆë‹¤ëŠ” ê²ƒì€ Winsockì„ ì‚¬ìš©í•  ì¤€ë¹„ê°€ ë˜ì—ˆë‹¤ëŠ” ì˜ë¯¸.
-    int code = WSAStartup(MAKEWORD(2, 2), &wsa);
 
-    if (!code) {
-        cin >> num;
+    WSADATA wsa;
+    // Winsock¸¦ ÃÊ±âÈ­ÇÏ´Â ÇÔ¼ö. MAKEWORD(2, 2)´Â WinsockÀÇ 2.2 ¹öÀüÀ» »ç¿ëÇÏ°Ú´Ù´Â ÀÇ¹Ì.
+    // ½ÇÇà¿¡ ¼º°øÇÏ¸é 0À», ½ÇÆĞÇÏ¸é ±× ÀÌ¿ÜÀÇ °ªÀ» ¹İÈ¯.
+    // 0À» ¹İÈ¯Çß´Ù´Â °ÍÀº WinsockÀ» »ç¿ëÇÒ ÁØºñ°¡ µÇ¾ú´Ù´Â ÀÇ¹Ì.
+    start_sql();
+    bool start = true;
+    char move;
+    int num = 1;
+    startMenu1();
+    while (start) {
+        move = _getch();
+        if (move == DOWN) {
+            ++num;
+            if (num > 2) {
+                num = 0;
+            }
+        }
+        else if (move == UP) {
+            --num;
+            if (num < 0) {
+                num = 2;
+            }
+        }
         switch (num) {
+        case 0:
+            startMenu0();
+            if (move == ENTER) {
+                endMenu();
+                move = _getch();
+                if (move == ENTER) {
+                    start = false;
+                    system("cls");
+                }
+                else {
+                    startMenu0();
+                }
+            }
+            break;
         case 1:
-            cout << "íšŒì›ê°€ì…ì„ ì‹œì‘í•©ë‹ˆë‹¤!";
-            cout << "ì´ë¦„ì„ ì…ë ¥í•˜ì„¸ìš” : ";
-            cin >> name;
-            cout << "ì•„ì´ë””ë¥¼ ì…ë ¥í•˜ì„¸ìš”(ì˜ë¬¸ê³¼ ìˆ«ì í¬í•¨ 8ìë¦¬ë¡œ ì…ë ¥í•˜ì„¸ìš”) : ";
-            cin >> id;
-            cout << "ë¹„ë°€ë²ˆí˜¸ë¥¼ ì…ë ¥í•˜ì„¸ìš” : ";
-            cin >> pw;
-            cout << "ìƒë…„ì›”ì¼ì„ ì…ë ¥í•˜ì„¸ìš” : ";
-            cin >> birth;
+            startMenu1();
+            if (move == ENTER) {
+                start = false;
+            }
             break;
         case 2:
-            cout << "ë¡œê·¸ì¸ì„ ì‹œì‘í•©ë‹ˆë‹¤!";
-            cout << "ì•„ì´ë””ë¥¼ ì…ë ¥í•˜ì„¸ìš”(ì˜ë¬¸ê³¼ ìˆ«ì í¬í•¨ 8ìë¦¬ë¡œ ì…ë ¥í•˜ì„¸ìš”) : ";
-            cin >> id;
-            cout << "ë¹„ë°€ë²ˆí˜¸ë¥¼ ì…ë ¥í•˜ì„¸ìš” : ";
-            cin >> pw;
+            startMenu2();
+            if (move == ENTER) {
+                start = false;
+            }
+            break;
+        default:
             break;
         }
-
-        client_sock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP); // 
-
-        // ì—°ê²°í•  ì„œë²„ ì •ë³´ ì„¤ì • ë¶€ë¶„
-        SOCKADDR_IN client_addr = {};
-        client_addr.sin_family = AF_INET;
-        client_addr.sin_port = htons(7777);
-        InetPton(AF_INET, TEXT("127.0.0.1"), &client_addr.sin_addr);
-
-        while (1) {
-            if (!connect(client_sock, (SOCKADDR*)&client_addr, sizeof(client_addr))) { // ìœ„ì— ì„¤ì •í•œ ì •ë³´ì— í•´ë‹¹í•˜ëŠ” serverë¡œ ì—°ê²°!
-                cout << "Server Connect" << endl;
-                send(client_sock, name.c_str(), 10, 0); // ì—°ê²°ì— ì„±ê³µí•˜ë©´ client ê°€ ì…ë ¥í•œ ë‹‰ë„¤ì„ì„ ì„œë²„ë¡œ ì „ì†¡
-                send(client_sock, id.c_str(), 8, 0);
-                send(client_sock, pw.c_str(), 50, 0);
-                send(client_sock, birth.c_str(), 10, 0);
-                break;
-            }
-            cout << "Connecting..." << endl;
+    }
+    int code = WSAStartup(MAKEWORD(2, 2), &wsa);
+    client_sock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP); // 
+    // ¿¬°áÇÒ ¼­¹ö Á¤º¸ ¼³Á¤ ºÎºĞ
+    SOCKADDR_IN client_addr = {};
+    client_addr.sin_family = AF_INET;
+    client_addr.sin_port = htons(7777);
+    InetPton(AF_INET, TEXT("127.0.0.1"), &client_addr.sin_addr);
+    while (1) {
+        if (!connect(client_sock, (SOCKADDR*)&client_addr, sizeof(client_addr))) { // À§¿¡ ¼³Á¤ÇÑ Á¤º¸¿¡ ÇØ´çÇÏ´Â server·Î ¿¬°á!
+            cout << "Server Connect" << endl;
+            break;
         }
-
+        else
+            cout << "Connecting..." << endl;
+    }
+    if (!code) {
+        switch (num) {
+        case 1:
+            log_in();
+            break;
+        case 2:
+            sign_in();
+            break;
+        }
         std::thread th2(chat_recv);
 
         while (1) {
             string text;
             std::getline(cin, text);
-            const char* buffer = text.c_str(); // stringí˜•ì„ char* íƒ€ì…ìœ¼ë¡œ ë³€í™˜
+            const char* buffer = text.c_str(); // stringÇüÀ» char* Å¸ÀÔÀ¸·Î º¯È¯
             send(client_sock, buffer, strlen(buffer), 0);
         }
         th2.join();
