@@ -1,97 +1,59 @@
-#pragma comment(lib, "ws2_32.lib") //ëª…ì‹œì ì¸ ë¼ì´ë¸ŒëŸ¬ë¦¬ì˜ ë§í¬. ìœˆì† ë¼ì´ë¸ŒëŸ¬ë¦¬ ì°¸ì¡°
+#pragma comment(lib, "ws2_32.lib") //¸í½ÃÀûÀÎ ¶óÀÌºê·¯¸®ÀÇ ¸µÅ©. À©¼Ó ¶óÀÌºê·¯¸® ÂüÁ¶
 
 #include <WinSock2.h>
 #include <string>
+#include <sstream>
 #include <iostream>
 #include <thread>
 #include <vector>
 #include <mysql/jdbc.h>
-
-#define MAX_SIZE 50
-#define MAX_CLIENT 3
+#include <ctime>
+#include <time.h>
+#define MAX_SIZE 1024
+#define MAX_CLIENT 10
 
 using std::cout;
 using std::cin;
 using std::endl;
 using std::string;
 
-const string server = "tcp://127.0.0.1:3306"; // ë°ì´í„°ë² ì´ìŠ¤ ì£¼ì†Œ
-const string username = "root"; // ë°ì´í„°ë² ì´ìŠ¤ ì‚¬ìš©ì
-const string password = "1234"; // ë°ì´í„°ë² ì´ìŠ¤ ì ‘ì† ë¹„ë°€ë²ˆí˜¸
 
-struct SOCKET_INFO { // ì—°ê²°ëœ ì†Œì¼“ ì •ë³´ì— ëŒ€í•œ í‹€ ìƒì„±
-    SOCKET sck;
-    string user, name, id, pw, birth;
-};
-
-std::vector<SOCKET_INFO> sck_list; // ì—°ê²°ëœ í´ë¼ì´ì–¸íŠ¸ ì†Œì¼“ë“¤ì„ ì €ì¥í•  ë°°ì—´ ì„ ì–¸.
-SOCKET_INFO server_sock; // ì„œë²„ ì†Œì¼“ì— ëŒ€í•œ ì •ë³´ë¥¼ ì €ì¥í•  ë³€ìˆ˜ ì„ ì–¸.
-int client_count = 0; // í˜„ì¬ ì ‘ì†í•´ ìˆëŠ” í´ë¼ì´ì–¸íŠ¸ë¥¼ count í•  ë³€ìˆ˜ ì„ ì–¸.
-
-void server_init(); // socket ì´ˆê¸°í™” í•¨ìˆ˜. socket(), bind(), listen() í•¨ìˆ˜ ì‹¤í–‰ë¨. ìì„¸í•œ ë‚´ìš©ì€ í•¨ìˆ˜ êµ¬í˜„ë¶€ì—ì„œ í™•ì¸.
-void add_client(); // ì†Œì¼“ì— ì—°ê²°ì„ ì‹œë„í•˜ëŠ” clientë¥¼ ì¶”ê°€(accept)í•˜ëŠ” í•¨ìˆ˜. client accept() í•¨ìˆ˜ ì‹¤í–‰ë¨. ìì„¸í•œ ë‚´ìš©ì€ í•¨ìˆ˜ êµ¬í˜„ë¶€ì—ì„œ í™•ì¸.
-void send_msg(const char* msg); // send() í•¨ìˆ˜ ì‹¤í–‰ë¨. ìì„¸í•œ ë‚´ìš©ì€ í•¨ìˆ˜ êµ¬í˜„ë¶€ì—ì„œ í™•ì¸.
-void recv_msg(int idx); // recv() í•¨ìˆ˜ ì‹¤í–‰ë¨. ìì„¸í•œ ë‚´ìš©ì€ í•¨ìˆ˜ êµ¬í˜„ë¶€ì—ì„œ í™•ì¸.
-void del_client(int idx); // ì†Œì¼“ì— ì—°ê²°ë˜ì–´ ìˆëŠ” clientë¥¼ ì œê±°í•˜ëŠ” í•¨ìˆ˜. closesocket() ì‹¤í–‰ë¨. ìì„¸í•œ ë‚´ìš©ì€ í•¨ìˆ˜ êµ¬í˜„ë¶€ì—ì„œ í™•ì¸.
-
-// MySQL Connector/C++ ì´ˆê¸°í™”
-sql::mysql::MySQL_Driver* driver; // ì¶”í›„ í•´ì œí•˜ì§€ ì•Šì•„ë„ Connector/C++ê°€ ìë™ìœ¼ë¡œ í•´ì œí•´ ì¤Œ
+sql::mysql::MySQL_Driver* driver; // ÃßÈÄ ÇØÁ¦ÇÏÁö ¾Ê¾Æµµ Connector/C++°¡ ÀÚµ¿À¸·Î ÇØÁ¦ÇØ ÁÜ
 sql::Connection* con;
 sql::Statement* stmt;
 sql::PreparedStatement* pstmt;
 sql::ResultSet* result;
-void start_sql(); //SQLì‹¤í–‰ - creatTable;
 
-int main() {
-    start_sql();
-    WSADATA wsa;
+const string server = "tcp://127.0.0.1:3306"; // µ¥ÀÌÅÍº£ÀÌ½º ÁÖ¼Ò
+const string username = "root"; // µ¥ÀÌÅÍº£ÀÌ½º »ç¿ëÀÚ
+const string password = "goflvhxj"; // µ¥ÀÌÅÍº£ÀÌ½º Á¢¼Ó ºñ¹Ğ¹øÈ£
+string nickname = "";
+string msg = "";
 
-    // Winsockë¥¼ ì´ˆê¸°í™”í•˜ëŠ” í•¨ìˆ˜. MAKEWORD(2, 2)ëŠ” Winsockì˜ 2.2 ë²„ì „ì„ ì‚¬ìš©í•˜ê² ë‹¤ëŠ” ì˜ë¯¸.
-    // ì‹¤í–‰ì— ì„±ê³µí•˜ë©´ 0ì„, ì‹¤íŒ¨í•˜ë©´ ê·¸ ì´ì™¸ì˜ ê°’ì„ ë°˜í™˜.
-    // 0ì„ ë°˜í™˜í–ˆë‹¤ëŠ” ê²ƒì€ Winsockì„ ì‚¬ìš©í•  ì¤€ë¹„ê°€ ë˜ì—ˆë‹¤ëŠ” ì˜ë¯¸.
-    int code = WSAStartup(MAKEWORD(2, 2), &wsa);
 
-    if (!code) {
-        server_init();
+struct SOCKET_INFO { // ¿¬°áµÈ ¼ÒÄÏ Á¤º¸¿¡ ´ëÇÑ Æ² »ı¼º
+    SOCKET sck;
+    string user;
+    bool hasSentEnterMsg; // ÀÔÀå ¸Ş½ÃÁö¸¦ º¸³Â´ÂÁö ¿©ºÎ
 
-        std::thread th1[MAX_CLIENT];
-        for (int i = 0; i < MAX_CLIENT; i++) {
-            // ì¸ì› ìˆ˜ ë§Œí¼ thread ìƒì„±í•´ì„œ ê°ê°ì˜ í´ë¼ì´ì–¸íŠ¸ê°€ ë™ì‹œì— ì†Œí†µí•  ìˆ˜ ìˆë„ë¡ í•¨.
-            th1[i] = std::thread(add_client);
-        }
-        //std::thread th1(add_client); // ì´ë ‡ê²Œ í•˜ë©´ í•˜ë‚˜ì˜ clientë§Œ ë°›ì•„ì§...
+};
 
-        while (1) { // ë¬´í•œ ë°˜ë³µë¬¸ì„ ì‚¬ìš©í•˜ì—¬ ì„œë²„ê°€ ê³„ì†í•´ì„œ ì±„íŒ… ë³´ë‚¼ ìˆ˜ ìˆëŠ” ìƒíƒœë¥¼ ë§Œë“¤ì–´ ì¤Œ. ë°˜ë³µë¬¸ì„ ì‚¬ìš©í•˜ì§€ ì•Šìœ¼ë©´ í•œ ë²ˆë§Œ ë³´ë‚¼ ìˆ˜ ìˆìŒ.
-            string text, msg = "";
+std::vector<SOCKET_INFO> sck_list; // ¿¬°áµÈ Å¬¶óÀÌ¾ğÆ® ¼ÒÄÏµéÀ» ÀúÀåÇÒ ¹è¿­ ¼±¾ğ.
+SOCKET_INFO server_sock; // ¼­¹ö ¼ÒÄÏ¿¡ ´ëÇÑ Á¤º¸¸¦ ÀúÀåÇÒ º¯¼ö ¼±¾ğ.
+int client_count = 0; // ÇöÀç Á¢¼ÓÇØ ÀÖ´Â Å¬¶óÀÌ¾ğÆ®¸¦ count ÇÒ º¯¼ö ¼±¾ğ.
 
-            std::getline(cin, text);
-            const char* buf = text.c_str();
-            msg = server_sock.name + " : " + buf;
-            send_msg(msg.c_str());
-        }
+void server_init(); // socket ÃÊ±âÈ­ ÇÔ¼ö. socket(), bind(), listen() ÇÔ¼ö ½ÇÇàµÊ. ÀÚ¼¼ÇÑ ³»¿ëÀº ÇÔ¼ö ±¸ÇöºÎ¿¡¼­ È®ÀÎ.
+void add_client(); // ¼ÒÄÏ¿¡ ¿¬°áÀ» ½ÃµµÇÏ´Â client¸¦ Ãß°¡(accept)ÇÏ´Â ÇÔ¼ö. client accept() ÇÔ¼ö ½ÇÇàµÊ. ÀÚ¼¼ÇÑ ³»¿ëÀº ÇÔ¼ö ±¸ÇöºÎ¿¡¼­ È®ÀÎ.
+void send_msg(const char* msg, string sender); // send() ÇÔ¼ö ½ÇÇàµÊ. ÀÚ¼¼ÇÑ ³»¿ëÀº ÇÔ¼ö ±¸ÇöºÎ¿¡¼­ È®ÀÎ.
+void recv_msg(int idx); // recv() ÇÔ¼ö ½ÇÇàµÊ. ÀÚ¼¼ÇÑ ³»¿ëÀº ÇÔ¼ö ±¸ÇöºÎ¿¡¼­ È®ÀÎ.
+void del_client(int idx); // ¼ÒÄÏ¿¡ ¿¬°áµÇ¾î ÀÖ´Â client¸¦ Á¦°ÅÇÏ´Â ÇÔ¼ö. closesocket() ½ÇÇàµÊ. ÀÚ¼¼ÇÑ ³»¿ëÀº ÇÔ¼ö ±¸ÇöºÎ¿¡¼­ È®ÀÎ.
+void send_private_msg(const char* msg, string sender);
+std::vector<string>chattingroom_member;
 
-        for (int i = 0; i < MAX_CLIENT; i++) {
-            th1[i].join();
-            //join : í•´ë‹¹í•˜ëŠ” thread ë“¤ì´ ì‹¤í–‰ì„ ì¢…ë£Œí•˜ë©´ ë¦¬í„´í•˜ëŠ” í•¨ìˆ˜.
-            //join í•¨ìˆ˜ê°€ ì—†ìœ¼ë©´ main í•¨ìˆ˜ê°€ ë¨¼ì € ì¢…ë£Œë˜ì–´ì„œ threadê°€ ì†Œë©¸í•˜ê²Œ ë¨.
-            //thread ì‘ì—…ì´ ëë‚  ë•Œê¹Œì§€ main í•¨ìˆ˜ê°€ ëë‚˜ì§€ ì•Šë„ë¡ í•´ì¤Œ.
-        }
-        //th1.join();
-
-        closesocket(server_sock.sck);
-    }
-    else {
-        cout << "í”„ë¡œê·¸ë¨ ì¢…ë£Œ. (Error code : " << code << ")";
-    }
-
-    WSACleanup();
-
-    return 0;
-}
-
+//start sql
 void start_sql()
 {
-    // MySQL Connector/C++ ì´ˆê¸°í™”
+    // MySQL Connector/C++ ÃÊ±âÈ­
     try {
         driver = sql::mysql::get_mysql_driver_instance();
         con = driver->connect(server, username, password);
@@ -101,156 +63,238 @@ void start_sql()
         exit(1);
     }
 
-    // ë°ì´í„°ë² ì´ìŠ¤ ì„ íƒ
-    con->setSchema("chating");
+    // µ¥ÀÌÅÍº£ÀÌ½º ¼±ÅÃ
+    con->setSchema("chatting");
 
-    // db í•œê¸€ ì €ì¥ì„ ìœ„í•œ ì…‹íŒ… 
+    // db ÇÑ±Û ÀúÀåÀ» À§ÇÑ ¼ÂÆÃ 
     stmt = con->createStatement();
     stmt->execute("set names euckr");
     if (stmt) { delete stmt; stmt = nullptr; }
+}
 
-    // ë°ì´í„°ë² ì´ìŠ¤ ì¿¼ë¦¬ ì‹¤í–‰
-    //stmt = con->createStatement();
-    //stmt->execute("DROP TABLE IF EXISTS userInfo"); // DROP
-    //cout << "Finished dropping table (if existed)" << endl;
-    //stmt->execute("CREATE TABLE userInfo (id VARCHAR(8) PRIMARY KEY, name VARCHAR(10), pw VARCHAR(50), birthday date);");
+int main() {
+    WSADATA wsa;
+    start_sql();
+    // Winsock¸¦ ÃÊ±âÈ­ÇÏ´Â ÇÔ¼ö. MAKEWORD(2, 2)´Â WinsockÀÇ 2.2 ¹öÀüÀ» »ç¿ëÇÏ°Ú´Ù´Â ÀÇ¹Ì.
+    // ½ÇÇà¿¡ ¼º°øÇÏ¸é 0À», ½ÇÆĞÇÏ¸é ±× ÀÌ¿ÜÀÇ °ªÀ» ¹İÈ¯.
+    // 0À» ¹İÈ¯Çß´Ù´Â °ÍÀº WinsockÀ» »ç¿ëÇÒ ÁØºñ°¡ µÇ¾ú´Ù´Â ÀÇ¹Ì.
+    int code = WSAStartup(MAKEWORD(2, 2), &wsa);
+
+    if (!code) {
+        server_init();
+
+        std::thread th1[MAX_CLIENT];
+        char buf[MAX_SIZE] = { };
+
+        for (int i = 0; i < MAX_CLIENT; i++) {
+            // ÀÎ¿ø ¼ö ¸¸Å­ thread »ı¼ºÇØ¼­ °¢°¢ÀÇ Å¬¶óÀÌ¾ğÆ®°¡ µ¿½Ã¿¡ ¼ÒÅëÇÒ ¼ö ÀÖµµ·Ï ÇÔ.
+            th1[i] = std::thread(add_client);
+
+            //std::thread th1(add_client); // ÀÌ·¸°Ô ÇÏ¸é ÇÏ³ªÀÇ client¸¸ ¹Ş¾ÆÁü...
+        }
+        while (1) { // ¹«ÇÑ ¹İº¹¹®À» »ç¿ëÇÏ¿© ¼­¹ö°¡ °è¼ÓÇØ¼­ Ã¤ÆÃ º¸³¾ ¼ö ÀÖ´Â »óÅÂ¸¦ ¸¸µé¾î ÁÜ. ¹İº¹¹®À» »ç¿ëÇÏÁö ¾ÊÀ¸¸é ÇÑ ¹ø¸¸ º¸³¾ ¼ö ÀÖÀ½.
+            string text, msg = "";
+
+            std::getline(cin, text);
+            const char* buf = text.c_str();
+            msg = server_sock.user + " : " + buf;
+            send_msg(msg.c_str(),server_sock.user);
+        }
 
 
-    //cout << "Finished creating table" << endl;
-    //delete stmt;
+        for (int i = 0; i < MAX_CLIENT; i++) {
+            th1[i].join();
+            //join : ÇØ´çÇÏ´Â thread µéÀÌ ½ÇÇàÀ» Á¾·áÇÏ¸é ¸®ÅÏÇÏ´Â ÇÔ¼ö.
+            //join ÇÔ¼ö°¡ ¾øÀ¸¸é main ÇÔ¼ö°¡ ¸ÕÀú Á¾·áµÇ¾î¼­ thread°¡ ¼Ò¸êÇÏ°Ô µÊ.
+            //thread ÀÛ¾÷ÀÌ ³¡³¯ ¶§±îÁö main ÇÔ¼ö°¡ ³¡³ªÁö ¾Êµµ·Ï ÇØÁÜ.
+        }
+        //th1.join();
 
-    //pstmt = con->prepareStatement("INSERT INTO userInfo(id_num, name, id, pw, birthday) VALUES(?,?)"); // INSERT
+        closesocket(server_sock.sck);
+    }
+    else {
+        cout << "ÇÁ·Î±×·¥ Á¾·á. (Error code : " << code << ")";
+    }
 
+    WSACleanup();
+
+    return 0;
 }
 
 void server_init() {
     server_sock.sck = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
-    // Internetì˜ Stream ë°©ì‹ìœ¼ë¡œ ì†Œì¼“ ìƒì„±
-   // SOCKET_INFOì˜ ì†Œì¼“ ê°ì²´ì— socket í•¨ìˆ˜ ë°˜í™˜ê°’(ë””ìŠ¤í¬ë¦½í„° ì €ì¥)
-   // ì¸í„°ë„· ì£¼ì†Œì²´ê³„, ì—°ê²°ì§€í–¥, TCP í”„ë¡œí† ì½œ ì“¸ ê²ƒ. 
+    // InternetÀÇ Stream ¹æ½ÄÀ¸·Î ¼ÒÄÏ »ı¼º
+   // SOCKET_INFOÀÇ ¼ÒÄÏ °´Ã¼¿¡ socket ÇÔ¼ö ¹İÈ¯°ª(µğ½ºÅ©¸³ÅÍ ÀúÀå)
+   // ÀÎÅÍ³İ ÁÖ¼ÒÃ¼°è, ¿¬°áÁöÇâ, TCP ÇÁ·ÎÅäÄİ ¾µ °Í. 
 
-    SOCKADDR_IN server_addr = {}; // ì†Œì¼“ ì£¼ì†Œ ì„¤ì • ë³€ìˆ˜
-    // ì¸í„°ë„· ì†Œì¼“ ì£¼ì†Œì²´ê³„ server_addr
+    SOCKADDR_IN server_addr = {}; // ¼ÒÄÏ ÁÖ¼Ò ¼³Á¤ º¯¼ö
+    // ÀÎÅÍ³İ ¼ÒÄÏ ÁÖ¼ÒÃ¼°è server_addr
 
-    server_addr.sin_family = AF_INET; // ì†Œì¼“ì€ Internet íƒ€ì… 
-    server_addr.sin_port = htons(7777); // ì„œë²„ í¬íŠ¸ ì„¤ì •
-    server_addr.sin_addr.s_addr = htonl(INADDR_ANY);  // ì„œë²„ì´ê¸° ë•Œë¬¸ì— local ì„¤ì •í•œë‹¤. 
-    //Anyì¸ ê²½ìš°ëŠ” í˜¸ìŠ¤íŠ¸ë¥¼ 127.0.0.1ë¡œ ì¡ì•„ë„ ë˜ê³  localhostë¡œ ì¡ì•„ë„ ë˜ê³  ì–‘ìª½ ë‹¤ í—ˆìš©í•˜ê²Œ í•  ìˆ˜ ìˆë”°. ê·¸ê²ƒì´ INADDR_ANYì´ë‹¤.
-    //ip ì£¼ì†Œë¥¼ ì €ì¥í•  ë• server_addr.sin_addr.s_addr -- ì •í•´ì§„ ëª¨ì–‘?
+    server_addr.sin_family = AF_INET; // ¼ÒÄÏÀº Internet Å¸ÀÔ 
+    server_addr.sin_port = htons(7777); // ¼­¹ö Æ÷Æ® ¼³Á¤
+    server_addr.sin_addr.s_addr = htonl(INADDR_ANY);  // ¼­¹öÀÌ±â ¶§¹®¿¡ local ¼³Á¤ÇÑ´Ù. 
+    //AnyÀÎ °æ¿ì´Â È£½ºÆ®¸¦ 127.0.0.1·Î Àâ¾Æµµ µÇ°í localhost·Î Àâ¾Æµµ µÇ°í ¾çÂÊ ´Ù Çã¿ëÇÏ°Ô ÇÒ ¼ö ÀÖµû. ±×°ÍÀÌ INADDR_ANYÀÌ´Ù.
+    //ip ÁÖ¼Ò¸¦ ÀúÀåÇÒ ¶© server_addr.sin_addr.s_addr -- Á¤ÇØÁø ¸ğ¾ç?
 
-    bind(server_sock.sck, (sockaddr*)&server_addr, sizeof(server_addr)); // ì„¤ì •ëœ ì†Œì¼“ ì •ë³´ë¥¼ ì†Œì¼“ì— ë°”ì¸ë”©í•œë‹¤.
-    listen(server_sock.sck, SOMAXCONN); // ì†Œì¼“ì„ ëŒ€ê¸° ìƒíƒœë¡œ ê¸°ë‹¤ë¦°ë‹¤.
-    server_sock.name = "server";
+    bind(server_sock.sck, (sockaddr*)&server_addr, sizeof(server_addr)); // ¼³Á¤µÈ ¼ÒÄÏ Á¤º¸¸¦ ¼ÒÄÏ¿¡ ¹ÙÀÎµùÇÑ´Ù.
+    listen(server_sock.sck, SOMAXCONN); // ¼ÒÄÏÀ» ´ë±â »óÅÂ·Î ±â´Ù¸°´Ù.
+    server_sock.user = "server";
 
     cout << "Server On" << endl;
 }
 
 void add_client() {
+    msg = " ";
     SOCKADDR_IN addr = {};
     int addrsize = sizeof(addr);
     char buf[MAX_SIZE] = { };
 
-    ZeroMemory(&addr, addrsize); // addrì˜ ë©”ëª¨ë¦¬ ì˜ì—­ì„ 0ìœ¼ë¡œ ì´ˆê¸°í™”
+    ZeroMemory(&addr, addrsize); // addrÀÇ ¸Ş¸ğ¸® ¿µ¿ªÀ» 0À¸·Î ÃÊ±âÈ­
 
     SOCKET_INFO new_client = {};
+
     new_client.sck = accept(server_sock.sck, (sockaddr*)&addr, &addrsize);
+    // Winsock2ÀÇ recv ÇÔ¼ö. client°¡ º¸³½ ´Ğ³×ÀÓÀ» ¹ŞÀ½.
+   
+    recv(new_client.sck, buf, MAX_SIZE, 0);
+    msg = buf;
 
-    if (new_client.sck != INVALID_SOCKET) {
-        char buf[MAX_SIZE];
-        ZeroMemory(&buf, MAX_SIZE);
-        int bytesReceived;
-
-        bytesReceived = recv(new_client.sck, buf, 10, 0);
-        if (bytesReceived > 0) {
-            cout << "buf name : " << buf << endl;
-            new_client.name = std::string(buf, bytesReceived);
-            ZeroMemory(&buf, 10);
-        }
-
-        bytesReceived = recv(new_client.sck, buf, 8, 0);
-        if (bytesReceived > 0) {
-            cout << "buf id : " << buf << endl;
-            new_client.id = std::string(buf, bytesReceived);
-            ZeroMemory(&buf, 8);
-        }
-
-        bytesReceived = recv(new_client.sck, buf, 50, 0);
-        if (bytesReceived > 0) {
-            cout << "buf pw : " << buf << endl;
-            new_client.pw = std::string(buf, bytesReceived);
-            ZeroMemory(&buf, 50);
-        }
-
-        bytesReceived = recv(new_client.sck, buf, MAX_SIZE, 0);
-        if (bytesReceived > 0) {
-            cout << "buf birth : " << buf << endl;
-            new_client.birth = std::string(buf, bytesReceived);
-            ZeroMemory(&buf, MAX_SIZE);
-        }
+    if (msg.find("*") != string::npos) {
+        msg.resize(msg.size() - 1);
+        chattingroom_member.push_back(msg);
     }
 
-    string msg = "[ê³µì§€] " + new_client.name + " ë‹˜ì´ ì…ì¥í–ˆìŠµë‹ˆë‹¤.";
-    cout << msg << endl;
-    sck_list.push_back(new_client); // client ì •ë³´ë¥¼ ë‹µëŠ” sck_list ë°°ì—´ì— ìƒˆë¡œìš´ client ì¶”ê°€
-
+    new_client.user = msg;
+    if (!new_client.hasSentEnterMsg) {
+        string msg = "[°øÁö] " + new_client.user + " ´ÔÀÌ ÀÔÀåÇß½À´Ï´Ù.";
+        cout << msg << endl;
+        send_msg(msg.c_str(), NULL);
+        new_client.hasSentEnterMsg = true;
+    }
+    sck_list.push_back(new_client);
     std::thread th(recv_msg, client_count);
-    // ë‹¤ë¥¸ ì‚¬ëŒë“¤ë¡œë¶€í„° ì˜¤ëŠ” ë©”ì‹œì§€ë¥¼ ê³„ì†í•´ì„œ ë°›ì„ ìˆ˜ ìˆëŠ” ìƒíƒœë¡œ ë§Œë“¤ì–´ ë‘ê¸°.
+    // ´Ù¸¥ »ç¶÷µé·ÎºÎÅÍ ¿À´Â ¸Ş½ÃÁö¸¦ °è¼ÓÇØ¼­ ¹ŞÀ» ¼ö ÀÖ´Â »óÅÂ·Î ¸¸µé¾î µÎ±â.
 
-    client_count++; // client ìˆ˜ ì¦ê°€.
-    cout << "[ê³µì§€] í˜„ì¬ ì ‘ì†ì ìˆ˜ : " << client_count << "ëª…" << endl;
-    send_msg(msg.c_str()); // c_str : string íƒ€ì…ì„ const chqr* íƒ€ì…ìœ¼ë¡œ ë°”ê¿”ì¤Œ.
-    pstmt = con->prepareStatement("INSERT INTO userinfo(name, id, pw, birthday) VALUES(?,?,?,?)");
+    client_count++; // client ¼ö Áõ°¡.
+    cout << "[°øÁö] ÇöÀç Á¢¼ÓÀÚ ¼ö : " << client_count << "¸í" << endl;
+    send_msg(msg.c_str(),new_client.user); // c_str : string Å¸ÀÔÀ» const chqr* Å¸ÀÔÀ¸·Î ¹Ù²ãÁÜ.
 
-    pstmt->setString(1, new_client.name);
-    pstmt->setString(2, new_client.id);
-    pstmt->setString(3, new_client.pw);
-    pstmt->setString(4, new_client.birth);
-
-    try {
-        pstmt->execute(); // SQL ì¿¼ë¦¬ ì‹¤í–‰
-        cout << "User " << new_client.name << " added to the database." << endl;
-    }
-    catch (sql::SQLException& e) {
-        cout << "SQL Error: " << e.what() << endl;
-    }
-
-    // MySQL Connector/C++ ì •ë¦¬
-    delete pstmt;
-    delete con;
     th.join();
 }
-
-void send_msg(const char* msg) {
-    for (int i = 0; i < client_count; i++) { // ì ‘ì†í•´ ìˆëŠ” ëª¨ë“  clientì—ê²Œ ë©”ì‹œì§€ ì „ì†¡
-        send(sck_list[i].sck, msg, MAX_SIZE, 0);
+void send_msg(const char* msg, string sender) {
+    string text = msg;
+    int count = 0;
+    for (int i = 0; i < client_count; i++) { // sender Á¦¿ÜÇÑ ¸ğµç client¿¡°Ô ¸Ş½ÃÁö Àü¼Û
+        if (sck_list[i].user != sender) {
+            for (int j = 0; j < chattingroom_member.size(); j++) {
+                if (sck_list[i].user == chattingroom_member[j])
+                    count++;
+            }
+            if (count == 0) {
+                send(sck_list[i].sck, text.c_str(), MAX_SIZE, 0);
+            }
+        }
     }
 }
-
+void send_private_msg(const char* msg, string sender) {
+    string text = msg;
+    for (int i = 0; i < client_count; i++) { // sender¿¡°Ô¸¸ client¿¡°Ô ¸Ş½ÃÁö Àü¼Û
+        if (sck_list[i].user == sender) {
+          
+            send(sck_list[i].sck, text.c_str(), MAX_SIZE, 0);
+        }
+    }
+}
+void send_game1_msg(const char* msg, string sender,std::vector<string>chattingroom_member) {
+    string text = msg;
+    for (int i = 0; i < client_count; i++) { // sender¿¡°Ô¸¸ client¿¡°Ô ¸Ş½ÃÁö Àü¼Û
+        for (int j = 0; j < chattingroom_member.size(); j++) {
+            if (sck_list[i].user == chattingroom_member[j] && sck_list[i].user != sender) {
+                send(sck_list[i].sck, text.c_str(), MAX_SIZE, 0);
+            }
+        }
+    }
+}
 void recv_msg(int idx) {
     char buf[MAX_SIZE] = { };
-    string msg = "";
-
-    //cout << sck_list[idx].user << endl;
-
     while (1) {
-        ZeroMemory(&buf, MAX_SIZE);
-        if (recv(sck_list[idx].sck, buf, MAX_SIZE, 0) > 0) { // ì˜¤ë¥˜ê°€ ë°œìƒí•˜ì§€ ì•Šìœ¼ë©´ recvëŠ” ìˆ˜ì‹ ëœ ë°”ì´íŠ¸ ìˆ˜ë¥¼ ë°˜í™˜. 0ë³´ë‹¤ í¬ë‹¤ëŠ” ê²ƒì€ ë©”ì‹œì§€ê°€ ì™”ë‹¤ëŠ” ê²ƒ.
-            msg = sck_list[idx].name + " : " + buf;
-            cout << msg << endl;
-            send_msg(msg.c_str());
-        }
-        else { //ê·¸ë ‡ì§€ ì•Šì„ ê²½ìš° í‡´ì¥ì— ëŒ€í•œ ì‹ í˜¸ë¡œ ìƒê°í•˜ì—¬ í‡´ì¥ ë©”ì‹œì§€ ì „ì†¡
-            msg = "[ê³µì§€] " + sck_list[idx].name + " ë‹˜ì´ í‡´ì¥í–ˆìŠµë‹ˆë‹¤.";
-            cout << msg << endl;
-            send_msg(msg.c_str());
-            del_client(idx); // í´ë¼ì´ì–¸íŠ¸ ì‚­ì œ
-            return;
-        }
-    }
-}
+        //Sleep(100);
+        int num = 0;
+        int i = 0;
+        msg = "";
+        struct tm timeinfo;
+        __time64_t temp;
+        string time;
+        _time64(&temp); // ½Ã½ºÅÛ ½Ã°£À» ¾ò½À´Ï´Ù.
 
+        ZeroMemory(&buf, MAX_SIZE);
+        if (recv(sck_list[idx].sck, buf, MAX_SIZE, 0) > 0) { // ¿À·ù°¡ ¹ß»ıÇÏÁö ¾ÊÀ¸¸é recv´Â ¼ö½ÅµÈ ¹ÙÀÌÆ® ¼ö¸¦ ¹İÈ¯. 0º¸´Ù Å©´Ù´Â °ÍÀº ¸Ş½ÃÁö°¡ ¿Ô´Ù´Â °Í.
+            nickname = sck_list[idx].user;
+            msg = buf;
+            std::stringstream buf2(msg.c_str());
+            string first, id, p_msg;
+            buf2 >> first >> id;
+            for (int i = 0; i < client_count; i++) {
+                if (id == sck_list[i].user && first == "/w") {
+                    num = 1;
+                    p_msg = msg.erase(0, 11);
+                    if (_localtime64_s(&timeinfo, &temp) == 0) {
+                        // ÇöÁö ½Ã°£ Á¤º¸¸¦ ¼º°øÀûÀ¸·Î ¾ò¾ú½À´Ï´Ù.
+                        char buffer[26]; // ¹®ÀÚ¿­ ¹öÆÛ¸¦ »ı¼ºÇÕ´Ï´Ù.
+                        if (asctime_s(buffer, sizeof(buffer), &timeinfo) == 0) {
+                            std::string timeString(buffer); // asctime·ÎºÎÅÍ ¾òÀº ¹®ÀÚ¿­
+                            time = timeString;
+                        }
+                    }
+                    pstmt = con->prepareStatement("INSERT INTO private_msg(sender, receiver ,message, time) VALUES(?,?,?,?)");
+                    pstmt->setString(1, nickname);
+                    pstmt->setString(2, id);
+                    pstmt->setString(3, p_msg);
+                    pstmt->setString(4, time);
+
+                    pstmt->execute();
+                    msg = "±Ó¼Ó¸»ÀÌ µµÂøÇß½À´Ï´Ù! [" + nickname + "]" + " : " + p_msg;
+                    send_private_msg(msg.c_str(), sck_list[i].user);
+                }
+            }
+            if (msg.find("*") != string::npos && num == 0) {
+                msg.resize(msg.size() - 1);
+                msg = nickname + " : " + msg;
+                cout << msg << endl;
+                send_game1_msg(msg.c_str(), nickname, chattingroom_member);
+            }
+            else if (num == 0) {
+                if (_localtime64_s(&timeinfo, &temp) == 0) {
+                    // ÇöÁö ½Ã°£ Á¤º¸¸¦ ¼º°øÀûÀ¸·Î ¾ò¾ú½À´Ï´Ù.
+                    char buffer[26]; // ¹®ÀÚ¿­ ¹öÆÛ¸¦ »ı¼ºÇÕ´Ï´Ù.
+                    if (asctime_s(buffer, sizeof(buffer), &timeinfo) == 0) {
+                        std::string timeString(buffer); // asctime·ÎºÎÅÍ ¾òÀº ¹®ÀÚ¿­
+                        time = timeString;
+                    }
+                }
+                cout << nickname + " : " + msg << endl;
+
+                pstmt = con->prepareStatement("INSERT INTO chat(nickname,message, time) VALUES(?,?,?)");
+
+                pstmt->setString(1, nickname);
+                pstmt->setString(2, msg);
+                pstmt->setString(3, time);
+                pstmt->execute();
+                msg = nickname + " : " + buf;
+                send_msg(msg.c_str(), sck_list[idx].user);
+            }
+        }
+            else { //±×·¸Áö ¾ÊÀ» °æ¿ì ÅğÀå¿¡ ´ëÇÑ ½ÅÈ£·Î »ı°¢ÇÏ¿© ÅğÀå ¸Ş½ÃÁö Àü¼Û
+                msg = "[°øÁö] " + sck_list[idx].user + " ´ÔÀÌ ÅğÀåÇß½À´Ï´Ù.";
+                cout << msg << endl;
+                send_msg(msg.c_str(), "");
+                del_client(idx); // Å¬¶óÀÌ¾ğÆ® »èÁ¦
+                return;
+            }
+        }
+}
 void del_client(int idx) {
     closesocket(sck_list[idx].sck);
-    //sck_list.erase(sck_list.begin() + idx); // ë°°ì—´ì—ì„œ í´ë¼ì´ì–¸íŠ¸ë¥¼ ì‚­ì œí•˜ê²Œ ë  ê²½ìš° indexê°€ ë‹¬ë¼ì§€ë©´ì„œ ëŸ°íƒ€ì„ ì˜¤ë¥˜ ë°œìƒ....ã…
+    sck_list.erase(sck_list.begin() + idx); // ¹è¿­¿¡¼­ Å¬¶óÀÌ¾ğÆ®¸¦ »èÁ¦ÇÏ°Ô µÉ °æ¿ì index°¡ ´Ş¶óÁö¸é¼­ ·±Å¸ÀÓ ¿À·ù ¹ß»ı....¤¾
     client_count--;
 }
