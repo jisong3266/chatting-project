@@ -6,7 +6,7 @@
 #include <sstream>
 #include <iostream>
 #include <thread>
-#include <Windows.h> // system("cls")를 사용하기 위한 헤더
+#include <Windows.h> // clear_screen()를 사용하기 위한 헤더
 #include <conio.h> // _getch()를 사용하기 위한 헤더 
 #include <mysql/jdbc.h>
 #include <vector>
@@ -17,15 +17,18 @@
 
 #define MAX_SIZE 1024
 #define ENTER 13
+#define UDLR 224
 #define UP 72
 #define DOWN 80
-#define ESC 27 
+#define LEFT 75
+#define RIGHT 77
+#define ESC 27
 #define BACKSP 8 // 아스키 코드 정의
 
 using std::cout;
 using std::cin;
 using std::endl;
-using std::string;
+using std::string; // namespace 정의
 
 sql::mysql::MySQL_Driver* driver; // 추후 해제하지 않아도 Connector/C++가 자동으로 해제해 줌
 sql::Connection* con;
@@ -35,12 +38,15 @@ sql::ResultSet* result;
 
 SOCKET client_sock;
 bool start = true;
-bool thread = true;
-bool flag = true;
+//bool thread = true;
+bool menu = true;
+bool chat = true;
+bool isSignin = false;
 bool chatout = false;
 char move;
 int num;
 string name, id, pw, birth;
+
 
 enum START_MOVE {
     OFF,
@@ -245,7 +251,7 @@ void change_inter()
     cout << " "; cout << "*                                                      *\n";
     cout << " "; cout << "********************************************************\n\n";
 }
-void login_menu()
+void login_menu(string& id)
 {
     clear_screen();
     cursor_view(false);
@@ -339,7 +345,7 @@ void adult_menu()
     cout << " "; cout << "*                                                      *\n";
     cout << " "; cout << "*           =▶  잠시만 기다려주세요 . . .              *\n";
     cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*               [ESC를 누르면 뒤로 가기]               *\n";
+    cout << " "; cout << "*                                                      *\n";
     cout << " "; cout << "*                                                      *\n";
     cout << " "; cout << "*                                                      *\n";
     cout << " "; cout << "*                                                      *\n";
@@ -387,15 +393,15 @@ void adultN_inter()
     cout << " "; cout << "*                 < 성인 확인 완료 >                   *\n";
     cout << " "; cout << "*                                                      *\n";
     cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*              =▶  성인이 아닙니다!                   *\n";
+    cout << " "; cout << "*              =▶  성인이 아닙니다 !                   *\n";
     cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*               [ESC를 누르면 뒤로 가기]               *\n";
+    cout << " "; cout << "*                                                      *\n";
     cout << " "; cout << "*                                                      *\n";
     cout << " "; cout << "*                                                      *\n";
     cout << " "; cout << "*                                                      *\n";
     cout << " "; cout << "********************************************************\n\n";
 }
-//start sql
+// start sql
 void start_sql()
 {
     // MySQL Connector/C++ 초기화
@@ -416,11 +422,12 @@ void start_sql()
     stmt->execute("set names euckr");
     if (stmt) { delete stmt; stmt = nullptr; }
 }
-// 입력 함수
-int getCharacter(char move, string& str, char ch, int i) {
+// 키보드 입력
+int key_input(char move, string& str, char ch, int i) {
     while (move != ENTER) {
         move = _getch();
-        if (move == ESC) return -1;
+        if (move == UP || move == DOWN || move == LEFT || move == RIGHT) return -1; // 방향키 입력시
+        if (move == ESC) return -1; // ESC 키를 누르면 이전 화면으로
         if (move == ENTER) break; // Enter 키를 누르면 입력 종료
         if (move == BACKSP) { // Backspace 키인 경우
             if (!str.empty()) { // 입력된 문자가 있으면
@@ -442,27 +449,41 @@ int getCharacter(char move, string& str, char ch, int i) {
     }
     return 0;
 }
+// 키보드 입력 무시
+void key_ignore() {
+    while (_kbhit()) {
+        char ch = _getch(); // 키 입력을 읽어서 버퍼에서 제거
+    }
+}
 // id 체크
-void check_id(string c_id) {
+int check_id(string id_input, string& id_output) {
     while (1) {
-        c_id = "";
         bool hangul = false;
         goto_xy(15, 7);
         for (int i = 0; i < 40; i++) {
             cout << " ";
         }
         goto_xy(15, 7);
-        if (getCharacter(move, c_id, '\0', 8) < 0) {
-            start = true;
-            flag = false;
-            return;
+        if (key_input(move, id_input, '\0', 8) < 0) {
+            if (isSignin) {
+                start = true;
+                menu = false;
+                chat = false;
+            }
+            else {
+                start = false;
+                menu = true;
+                chat = false;
+            }
+            return -1; // ESC일때 -1 반환
         }
-        for (int i = 0; i < c_id.size(); i++) {
-            if ((c_id[i] & 0x80) == 0x80) {
+        for (int i = 0; i < id_input.size(); i++) {
+            if ((id_input[i] & 0x80) == 0x80) {
                 hangul = true;
             }
         }
-        if (hangul || c_id.size() != 8) {
+        if (hangul || id_input.size() != 8) {
+            id_input = "";
             goto_xy(2, 8);
             cout << "                                                      ";
             goto_xy(13, 8);
@@ -470,11 +491,12 @@ void check_id(string c_id) {
             continue;
         }
         pstmt = con->prepareStatement("SELECT id FROM userinfo WHERE id = ?");
-        pstmt->setString(1, c_id);
+        pstmt->setString(1, id_input);
         result = pstmt->executeQuery();
         if (result->next()) {
             string db_id = result->getString(1);
-            if (db_id == c_id) {
+            if (db_id == id_input) {
+                id_input = "";
                 goto_xy(2, 8);
                 cout << "                                                      ";
                 goto_xy(13, 8);
@@ -488,105 +510,111 @@ void check_id(string c_id) {
             goto_xy(2, 8);
             cout << "                                                      ";
             goto_xy(13, 8);
-            id = c_id;
-            cout << " =▶ ID 체크완료 ! " << id << endl;
-            break;
+            id_output = id_input;
+            cout << " =▶ ID 체크완료 ! " << id_output << endl;
+            return 0; // ID 체크완료일때 0 반환
         }
     }
 }
 // 성인 인증
 int check_birth(string c_id) {
     adult_menu();
-    Sleep(2000);
+    Sleep(1500);
     pstmt = con->prepareStatement("SELECT birthday FROM userinfo WHERE id = ? and birthday < '2004.12.31'");
     pstmt->setString(1, c_id);
     result = pstmt->executeQuery();
     if (result->next()) {
-        string db_birth = result->getString(1);
-        if (db_birth == "") {
-            adultN_inter();
-            return 0;
-            // 성인이 아닌 경우
-        }
-        else {
-            adultY_inter();
-            return -1;
-            // 성인인 경우
-        }
+        adultY_inter();
+        return -1;
     }
-    return 0;
+    else {
+        adultN_inter();
+        Sleep(1000);
+        return 0;
+    }
 }
 // 회원가입
 void sign_in() {
     name = "";
     pw = "";
+    string sign_id = "";
     char guard = '+';
+    isSignin = true;
     goto_xy(0, 0);
     sign_inter();
     move = '\0';
     goto_xy(14, 5);
-    if (getCharacter(move, name, '\0', 10) < 0) {
+    if (key_input(move, name, '\0', 10) < 0) {
         start = true;
-        flag = false;
+        menu = false;
+        chat = false;
         return;
     }
-    check_id(id);
-    goto_xy(17, 10);
-    if (getCharacter(move, pw, guard, 12) < 0) {
-        start = true;
-        flag = false;
+    if (check_id(sign_id, id) < 0) {
         return;
     }
-    while (1) {
-        birth = "";
-        goto_xy(17, 12);
-        for (int i = 0; i < 35; i++) {
-            cout << " ";
-        }
-        goto_xy(17, 12);
-        if (getCharacter(move, birth, '\0', 10) < 0) {
+    else {
+        goto_xy(17, 10);
+        if (key_input(move, pw, guard, 12) < 0) {
             start = true;
-            flag = false;
+            menu = false;
+            chat = false;
             return;
         }
+        while (1) {
+            birth = "";
+            goto_xy(17, 12);
+            for (int i = 0; i < 35; i++) {
+                cout << " ";
+            }
+            goto_xy(17, 12);
+            if (key_input(move, birth, '\0', 10) < 0) {
+                start = true;
+                menu = false;
+                chat = false;
+                return;
+            }
 
-        int year, month, day;
-        char dash1, dash2;
+            int year, month, day;
+            char dash1, dash2;
 
-        // 문자열 스트림을 사용하여 파싱
-        std::istringstream ss(birth);
-        ss >> year >> dash1 >> month >> dash2 >> day;
+            // 문자열 스트림을 사용하여 파싱
+            std::istringstream ss(birth);
+            ss >> year >> dash1 >> month >> dash2 >> day;
 
-        if (ss && dash1 == '-' && dash2 == '-' && month < 13 && day < 32) {
-            goto_xy(2, 13);
-            cout << "                                                      ";
-            break;
+            if (ss && dash1 == '-' && dash2 == '-' && month < 13 && day < 32) {
+                goto_xy(2, 13);
+                cout << "                                                      ";
+                break;
+            }
+            else {
+                goto_xy(13, 13);
+                cout << "※ 경고 : 잘못된 형식입니다!";
+                continue;
+            }
         }
-        else {
-            goto_xy(13, 13);
-            cout << "※ 경고 : 잘못된 형식입니다!";
-            continue;
+        pstmt = con->prepareStatement("INSERT INTO userinfo(name, id, pw, birthday) VALUES(?,?,?,?)");
+        pstmt->setString(1, name);
+        pstmt->setString(2, id);
+        pstmt->setString(3, pw);
+        pstmt->setString(4, birth);
+        try {
+            pstmt->execute(); // SQL 쿼리 실행
+            goto_xy(5, 14);
+            cout << "User " << name << " added to the database.";
+            Sleep(1500);
+            start = true;
+            menu = false;
+            chat = false;
         }
-    }
-    pstmt = con->prepareStatement("INSERT INTO userinfo(name, id, pw, birthday) VALUES(?,?,?,?)");
-    pstmt->setString(1, name);
-    pstmt->setString(2, id);
-    pstmt->setString(3, pw);
-    pstmt->setString(4, birth);
-    try {
-        pstmt->execute(); // SQL 쿼리 실행
-        goto_xy(5, 14);
-        cout << "User " << name << " added to the database.";
-        Sleep(3000);
-        start = true;
-        flag = false;
-    }
-    catch (sql::SQLException& e) {
-        goto_xy(5, 14);
-        cout << "SQL Error: " << e.what();
-        Sleep(2000);
-        start = true;
-        flag = false;
+        catch (sql::SQLException& e) {
+            goto_xy(5, 14);
+            cout << "SQL Error: " << e.what();
+            Sleep(1500);
+            start = true;
+            menu = false;
+            chat = false;
+        }
     }
 }
 // 로그인
@@ -599,15 +627,17 @@ void log_in() {
         login_inter();
         move = '\0';
         goto_xy(17, 13);
-        if (getCharacter(move, id, '\0', 8) < 0) {
+        if (key_input(move, id, '\0', 8) < 0) {
             start = true;
-            flag = false;
+            menu = false;
+            chat = false;
             return;
         }
         goto_xy(17, 15);
-        if (getCharacter(move, pw, guard, 12) < 0) {
+        if (key_input(move, pw, guard, 12) < 0) {
             start = true;
-            flag = false;
+            menu = false;
+            chat = false;
             return;
         }
         pstmt = con->prepareStatement("SELECT id, pw FROM userinfo WHERE id = ? AND pw = ?");
@@ -624,7 +654,7 @@ void log_in() {
                 cout << "                                                      ";
                 goto_xy(16, 17);
                 cout << " =▶ 로그인 완료 ! ";
-                Sleep(2000);
+                Sleep(1500);
                 break;
             }
             else {
@@ -642,19 +672,29 @@ void log_in() {
 }
 // 회원정보수정
 void change_info() {
-    string beforeID = id;
+    string beforeID = id; // 이전 ID를 저장합니다.
+    string checkID = "";
+    string newID = "";
     char guard = '+';
+    isSignin = false;
+
     while (1) {
         pw = "";
         move = '\0';
         goto_xy(0, 0);
         pw_inter();
         goto_xy(17, 10);
-        if (getCharacter(move, pw, guard, 12) < 0) {
+
+        if (key_input(move, pw, guard, 12) < 0) {
+            login_menu(id);
+            goto_xy(17, 15);
+            cout << "=▶";
             return;
         }
+
+        key_ignore();
         pstmt = con->prepareStatement("SELECT pw FROM userinfo WHERE id = ?");
-        pstmt->setString(1, beforeID);
+        pstmt->setString(1, id);
         result = pstmt->executeQuery();
 
         if (result->next()) {
@@ -663,83 +703,209 @@ void change_info() {
             if (db_pw == pw) {
                 goto_xy(15, 11);
                 cout << " =▶ 비밀번호 확인 완료 !";
-                Sleep(2000);
+                Sleep(1500);
                 goto_xy(0, 0);
                 change_inter();
                 name = "";
                 goto_xy(14, 5);
-                if (getCharacter(move, name, '\0', 10) < 0) {
+
+                if (key_input(move, name, '\0', 10) < 0) {
                     return;
                 }
-                check_id(id);
-                goto_xy(17, 10);
-                pw = "";
-                if (getCharacter(move, pw, guard, 12) < 0) {
+
+                if (check_id(checkID, newID) < 0) {
+                    id = beforeID;
                     return;
                 }
-                while (1) {
-                    birth = "";
-                    goto_xy(17, 12);
-                    for (int i = 0; i < 35; i++) {
-                        cout << " ";
-                    }
-                    goto_xy(17, 12);
-                    if (getCharacter(move, birth, '\0', 10) < 0) {
+                else {
+                    goto_xy(17, 10);
+                    pw = "";
+                    if (key_input(move, pw, guard, 12) < 0) {
                         return;
                     }
 
-                    int year, month, day;
-                    char dash1, dash2;
+                    while (1) {
+                        birth = "";
+                        goto_xy(17, 12);
 
-                    // 문자열 스트림을 사용하여 파싱
-                    std::istringstream ss(birth);
-                    ss >> year >> dash1 >> month >> dash2 >> day;
+                        for (int i = 0; i < 35; i++) {
+                            cout << " ";
+                        }
 
-                    if (ss && dash1 == '-' && dash2 == '-' && month < 13 && day < 32) {
-                        goto_xy(2, 13);
-                        cout << "                                                      ";
-                        break;
+                        goto_xy(17, 12);
+                        if (key_input(move, birth, '\0', 10) < 0) {
+                            return;
+                        }
+
+                        int year, month, day;
+                        char dash1, dash2;
+
+                        // 문자열 스트림을 사용하여 파싱
+                        std::istringstream ss(birth);
+                        ss >> year >> dash1 >> month >> dash2 >> day;
+
+                        if (ss && dash1 == '-' && dash2 == '-' && month < 13 && day < 32) {
+                            goto_xy(2, 13);
+                            cout << "                                                      ";
+                            break;
+                        }
+                        else {
+                            goto_xy(13, 13);
+                            cout << "※ 경고 : 잘못된 형식입니다!";
+                            continue;
+                        }
                     }
-                    else {
-                        goto_xy(13, 13);
-                        cout << "※ 경고 : 잘못된 형식입니다!";
-                        continue;
+                    // newID 값을 id로 복사
+                    id = newID;
+                    pstmt = con->prepareStatement("UPDATE userinfo SET name = ?, id = ?, pw = ?, birthday = ? where id = ?");
+                    pstmt->setString(1, name);
+                    pstmt->setString(2, newID);
+                    pstmt->setString(3, pw);
+                    pstmt->setString(4, birth);
+                    pstmt->setString(5, beforeID);
+
+                    try {
+                        pstmt->execute(); // SQL 쿼리 실행
+                        goto_xy(5, 14);
+                        cout << "※ 알림 : " << name << " 님의 회원정보가 수정되었습니다 !";
+                        Sleep(1500);
+                    }
+                    catch (sql::SQLException& e) {
+                        goto_xy(5, 14);
+                        cout << "※ 오류 : " << name << " 님의 회원정보 수정이 실패했습니다 !" << endl;
+                        goto_xy(5, 15);
+                        cout << "자세한 사항은 회원 정보 수정 양식을 확인하세요 . . ." << endl;
+                        Sleep(1500);
                     }
                 }
-                pstmt = con->prepareStatement("UPDATE userinfo SET name = ?, id = ?, pw = ?, birthday = ? where id =?");
-                pstmt->setString(1, name);
-                pstmt->setString(2, id);
-                pstmt->setString(3, pw);
-                pstmt->setString(4, birth);
-                pstmt->setString(5, beforeID);
-                try {
-                    pstmt->execute(); // SQL 쿼리 실행
-                    goto_xy(5, 14);
-                    cout << "User " << name << " added to the database.";
-                    Sleep(3000);
-                }
-                catch (sql::SQLException& e) {
-                    goto_xy(5, 14);
-                    cout << "SQL Error: " << e.what();
-                    Sleep(3000);
-                }
-                start = true;
-                flag = false;
-                break;
             }
             else {
                 goto_xy(5, 14);
                 cout << "※ 경고 : 회원정보가 일치하지 않습니다!";
-                Sleep(1500);
+                Sleep(1000);
             }
         }
         else {
             goto_xy(5, 11);
             cout << "※ 경고 : 회원정보가 일치하지 않습니다!";
-            Sleep(1500);
+            Sleep(1000);
         }
     }
 }
+
+//void change_info() {
+//    string checkID="";
+//    string newID="";
+//    char guard = '+';
+//    isSignin = false;
+//    while (1) {
+//        pw = "";
+//        move = '\0';
+//        goto_xy(0, 0);
+//        pw_inter();
+//        goto_xy(17, 10);
+//
+//        if (key_input(move, pw, guard, 12) < 0) {
+//            login_menu(id);
+//            goto_xy(17, 15);
+//            cout << "=▶";
+//            return;
+//        }
+//
+//        key_ignore();
+//        pstmt = con->prepareStatement("SELECT pw FROM userinfo WHERE id = ?");
+//        pstmt->setString(1, id);
+//        result = pstmt->executeQuery();
+//
+//        if (result->next()) {
+//            string db_pw = result->getString(1);
+//
+//            if (db_pw == pw) {
+//                goto_xy(15, 11);
+//                cout << " =▶ 비밀번호 확인 완료 !";
+//                Sleep(1500);
+//                goto_xy(0, 0);
+//                change_inter();
+//                name = "";
+//                goto_xy(14, 5);
+//
+//                if (key_input(move, name, '\0', 10) < 0) {
+//                    return;
+//                }
+//
+//                if (check_id(checkID, newID) < 0) {
+//                    return;
+//                }
+//                else {
+//
+//                    goto_xy(17, 10);
+//                    pw = "";
+//                    if (key_input(move, pw, guard, 12) < 0) {
+//                        return;
+//                    }
+//                    while (1) {
+//                        birth = "";
+//                        goto_xy(17, 12);
+//                        for (int i = 0; i < 35; i++) {
+//                            cout << " ";
+//                        }
+//                        goto_xy(17, 12);
+//                        if (key_input(move, birth, '\0', 10) < 0) {
+//                            return;
+//                        }
+//
+//                        int year, month, day;
+//                        char dash1, dash2;
+//
+//                        // 문자열 스트림을 사용하여 파싱
+//                        std::istringstream ss(birth);
+//                        ss >> year >> dash1 >> month >> dash2 >> day;
+//
+//                        if (ss && dash1 == '-' && dash2 == '-' && month < 13 && day < 32) {
+//                            goto_xy(2, 13);
+//                            cout << "                                                      ";
+//                            break;
+//                        }
+//                        else {
+//                            goto_xy(13, 13);
+//                            cout << "※ 경고 : 잘못된 형식입니다!";
+//                            continue;
+//                        }
+//                    }
+//                    pstmt = con->prepareStatement("UPDATE userinfo SET name = ?, id = ?, pw = ?, birthday = ? where id =?");
+//                    pstmt->setString(1, name);
+//                    pstmt->setString(2, newID);
+//                    pstmt->setString(3, pw);
+//                    pstmt->setString(4, birth);
+//                    pstmt->setString(5, id);
+//                    try {
+//                        pstmt->execute(); // SQL 쿼리 실행
+//                        goto_xy(5, 14);
+//                        cout << "※ 알림 : " << name << " 님의 회원정보가 수정되었습니다 !";
+//                        Sleep(1500);
+//                    }
+//                    catch (sql::SQLException& e) {
+//                        goto_xy(5, 14);
+//                        cout << "※ 오류 : " << name << " 님의 회원정보 수정이 실패했습니다 !" << endl;
+//                        goto_xy(5, 15);
+//                        cout << "자세한 사항은 회원 정보 수정 양식을 확인하세요 . . ." << endl;
+//                        Sleep(1500);
+//                    }
+//                }
+//            }
+//            else {
+//                goto_xy(5, 14);
+//                cout << "※ 경고 : 회원정보가 일치하지 않습니다!";
+//                Sleep(1000);
+//            }
+//        }
+//        else {
+//            goto_xy(5, 11);
+//            cout << "※ 경고 : 회원정보가 일치하지 않습니다!";
+//            Sleep(1000);
+//        }
+//    }
+//}
 // 메시지 받기
 int chat_recv() {
     char buf[MAX_SIZE] = { };
@@ -833,6 +999,9 @@ void send_msg() {
         text = "";
         move = '\0';
         if (get_chat(move, text, '\0', 55) < 0) {
+            const char* buffer = text.c_str(); // string형을 char* 타입으로 변환
+            send(client_sock, buffer, strlen(buffer), 0);
+            cout << endl;
             return;//함수 종료
         }
         if (text == "/secret") {
@@ -841,6 +1010,9 @@ void send_msg() {
                 text = "";
                 move = '\0';
                 if (get_chat(move, text, '*', 55) < 0) {
+                    const char* buffer = text.c_str(); // string형을 char* 타입으로 변환
+                    send(client_sock, buffer, strlen(buffer), 0);
+                    cout << endl;
                     return;
                 }
                 if (text == "/normal") {
@@ -860,17 +1032,48 @@ void send_msg() {
         cout << endl;
     }
 }
-void send_game1_msg() {
+void send_msg_adult() {
     string text;
     while (1) {
-        std::getline(cin, text);
+        text = "";
+        move = '\0';
+        if (get_chat(move, text, '\0', 55) < 0) {
+            text += "_adult";
+            const char* buffer = text.c_str(); // string형을 char* 타입으로 변환
+            send(client_sock, buffer, strlen(buffer), 0);
+            cout << endl;
+            return;//함수 종료
+        }
+        if (text == "/secret") {
+            cout << endl << "비밀 모드에 진입합니다 !" << endl;
+            while (1) {
+                text = "";
+                move = '\0';
+                if (get_chat(move, text, '*', 55) < 0) {
+                    return;
+                }
+                if (text == "/normal") {
+                    text = "";
+                    cout << endl << "노말 모드로 복귀합니다 !" << endl;
+                    break;
+                }
+                text = check_badwords(text);
+                text += "*";
+                send(client_sock, text.c_str(), MAX_SIZE, 0);
+                cout << endl;
+            }
+        }
+        text = check_badwords(text);
         text += "*";
-        send(client_sock, text.c_str(), MAX_SIZE, 0);
+        if (text != "*") {
+            send(client_sock, text.c_str(), MAX_SIZE, 0);
+            cout << endl;
+        }
     }
-    
 }
-//전체 채팅방
+// 전체 채팅방
 void chatting_room1() {
+    chatout = false;
     client_sock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
     // 연결할 서버 정보 설정 부분
     SOCKADDR_IN client_addr = {};
@@ -892,31 +1095,32 @@ void chatting_room1() {
     stmt = con->createStatement();
     result = stmt->executeQuery("SELECT nickname, message, time FROM chat order by chat_num desc limit 5");
     // 결과 출력
+    cout << "\n================최근 메세지입니다================\n";
     while (result->next()) {
         recent_msg.push_back(result->getString(1) + " : " + result->getString(2) + "   " + result->getString(3));
     }
     std::reverse(recent_msg.begin(), recent_msg.end());
     for (string i : recent_msg) cout << i << endl;
-    cout << "\n================최근 메세지입니다================\n";
+    cout << "\n================귓속말 메세지입니다================\n";
     pstmt = con->prepareStatement("SELECT sender, message, time FROM private_msg where receiver = ?");
     pstmt->setString(1, id);
     result = pstmt->executeQuery();
     while (result->next()) {
         cout << result->getString(1) + " : " + result->getString(2) + "   " + result->getString(3) << endl;
-    }
-    cout << "\n================귓속말 메세지입니다================\n";
-    std::thread th2(chat_recv);
+    }    std::thread th2(chat_recv);
     send_msg();
     if (chatout) {
         closesocket(client_sock);
-        shutdown(client_sock, SD_RECEIVE);
+        //shutdown(client_sock, SD_RECEIVE);
+        //Sleep(1000);
         start = false;
-        flag = true;
-        thread = false;
+        menu = true;
+        chat = false;
+        //  thread = false;
         th2.join();
         return;
     }
-    thread = false;
+    //  thread = false;
     th2.join();
 
 }
@@ -942,9 +1146,18 @@ void chatting_room2() {
     game1_id = id + "*";
     send(client_sock, game1_id.c_str(), 9, 0);
     std::thread th3(chat_recv);
-    send_game1_msg();
-    th3.join();
-    thread = false;
+    send_msg_adult();
+    if (chatout) {
+        closesocket(client_sock);
+        //shutdown(client_sock, SD_RECEIVE);
+        start = false;
+        menu = true;
+        chat = false;
+        //  thread = false;
+        th3.join();
+        return;
+    }
+    //  thread = false;
 }
 //끝말잇기 게임
 
@@ -960,16 +1173,13 @@ int main() {
 
     while (interFace) {
 
-        while (_kbhit()) {
-            char ch = '\0';
-            ch = _getch(); // 키 입력을 읽어서 버퍼에서 제거
+        if (start) {
+            key_ignore();
+            num = LOG_IN;
+            start_menu();
+            goto_xy(17, 13);
+            cout << "=▶";
         }
-        num = LOG_IN;
-        bool log = true;
-        bool chat = false;
-        start_menu();
-        goto_xy(17, 13);
-        cout << "=▶";
         while (start) {
             move = _getch();
             if (move == DOWN) {
@@ -995,13 +1205,12 @@ int main() {
                     if (move == ENTER) {
                         clear_screen();
                         start = false;
-                        flag = false;
-                        log = false;
-                        num = 100;
+                        menu = false;
+                        chat = false;
                         interFace = false;
                         break;
                     }
-                    else {
+                    else if (move == ESC) {
                         start_menu();
                         goto_xy(17, 17);
                         cout << "=▶";
@@ -1014,7 +1223,7 @@ int main() {
                 cout << "=▶";
                 if (move == ENTER) {
                     start = false;
-                    flag = true;
+                    menu = true;
                 }
                 break;
             case SIGN_IN:
@@ -1023,206 +1232,205 @@ int main() {
                 cout << "=▶";
                 if (move == ENTER) {
                     start = false;
-                    flag = true;
+                    menu = true;
                 }
                 break;
             default:
                 break;
             }
         }
-        if (!code && flag) {
+
+        if (menu) {
             switch (num) {
             case LOG_IN:
                 log_in();
+                key_ignore();
+                num = CHAT_IN;
+                login_menu(id);
+                goto_xy(17, 13);
+                cout << "=▶";
                 break;
             case SIGN_IN:
                 clear_screen();
                 sign_in();
                 break;
-            }
-            if (flag && num == LOG_IN) {
-                login_menu();
+            default:
+                num = CHAT_IN;
+                login_menu(id);
                 goto_xy(17, 13);
                 cout << "=▶";
+                break;
             }
-
-            while (_kbhit()) {
-                char ch = '\0';
-                ch = _getch(); // 키 입력을 읽어서 버퍼에서 제거
+        }
+        while (menu) {
+            move = _getch();
+            if (move == DOWN) {
+                ++num;
+                if (num > CHANGE) {
+                    num = LOG_OUT;
+                }
             }
-
-            num = CHAT_IN;
-            //bool inChatRoom = false;  // 채팅방에 입장했는지 여부를 나타내는 플래그
-            //bool inWordChain = false;  // 끝말잇기 게임 중인지 여부를 나타내는 플래그
-            while (flag) {
-                while (log) {
+            else if (move == UP) {
+                --num;
+                if (num < LOG_OUT) {
+                    num = CHANGE;
+                }
+            }
+            switch (num) {
+            case LOG_OUT:
+                login_menu(id);
+                goto_xy(17, 17);
+                cout << "=▶";
+                if (move == ENTER) {
+                    logout_menu();
                     move = _getch();
-                    if (move == DOWN) {
-                        ++num;
-                        if (num > CHANGE) {
-                            num = LOG_OUT;
-                        }
+                    if (move == ENTER) {
+                        start = true;
+                        menu = false;
+                        chat = false;
                     }
-                    else if (move == UP) {
-                        --num;
-                        if (num < LOG_OUT) {
-                            num = CHANGE;
-                        }
-                    }
-
-                    switch (num) {
-                    case LOG_OUT:
-                        login_menu();
+                    else if (move == ESC) {
+                        login_menu(id);
                         goto_xy(17, 17);
                         cout << "=▶";
-                        if (move == ENTER) {
-                            logout_menu();
-                            move = _getch();
-                            if (move == ENTER) {
-                                start = true;
-                                flag = false;
-                                log = false;
-                            }
-                            else {
-                                login_menu();
-                                goto_xy(17, 17);
-                                cout << "=▶";
-                            }
-                        }
-                        break;
-                    case CHAT_IN:
-                        login_menu();
-                        goto_xy(17, 13);
-                        cout << "=▶";
-                        if (move == ENTER) {
-                            log = false;
-                            chat = true;
-                            //inChatRoom = true;  // 채팅방에 입장한 상태로 플래그 설정
-                        }
-                        break;
-                    case CHANGE:
-                        login_menu();
-                        goto_xy(17, 15);
-                        cout << "=▶";
-                        if (move == ENTER) {
-                            change_info();
-                        }
-                        break;
-                    default:
-                        break;
                     }
                 }
-
-                if (chat && num == CHAT_IN) {
-                    chat_menu();
+                break;
+            case CHAT_IN:
+                login_menu(id);
+                goto_xy(17, 13);
+                cout << "=▶";
+                if (move == ENTER) {
+                    key_ignore();
+                    menu = false;
+                    chat = true;
+                }
+                else if (move == ESC) {
+                    login_menu(id);
                     goto_xy(17, 13);
                     cout << "=▶";
                 }
-
-                while (_kbhit()) {
-                    char ch = '\0';
-                    ch = _getch(); // 키 입력을 읽어서 버퍼에서 제거
+                break;
+            case CHANGE:
+                login_menu(id);
+                goto_xy(17, 15);
+                cout << "=▶";
+                if (move == ENTER) {
+                    change_info();
+                    login_menu(id);
+                    goto_xy(17, 15);
+                    cout << "=▶";
                 }
-
-                while (chat) {
-                    move = _getch();
-                    if (move == DOWN) {
-                        ++num;
-                        if (num > GAME) {
-                            num = ALL_CHAT;
-                        }
-                    }
-                    else if (move == UP) {
-                        --num;
-                        if (num < ALL_CHAT) {
-                            num = GAME;
-                        }
-                    }
-                    else if (move == ESC) {
-                        chat = false;
-                        log = true;
-                        num = CHAT_IN;
-                        //inChatRoom = false;  // 채팅방에서 나갔을 때 플래그 해제
-                        break;
-                    }
-                    switch (num) {
-                    case ALL_CHAT:
-                        chat_menu();
-                        goto_xy(17, 13);
-                        cout << "=▶";
-                        if (move == ENTER) {
-                            chat = false;
-                            flag = false;
-                        }
-                        else if (move == ESC) {
-                            chat = false;
-                            log = true;
-                            num = CHAT_IN;
-                            break;
-                        }
-                        break;
-                    case ADULT_CHAT:
-                        chat_menu();
-                        goto_xy(17, 15);
-                        cout << "=▶";
-                        if (move == ENTER) {
-                            if (check_birth(id) < 0) {
-                                chat = false;
-                                flag = false;
-                            }
-                            else {
-                                chat = false;
-                                log = true;
-                                num = CHAT_IN;
-                                break;
-                            }
-                        }
-                        else if (move == ESC) {
-                            chat = false;
-                            log = true;
-                            num = CHAT_IN;
-                            break;
-                        }
-                        break;
-                    case GAME:
-                        chat_menu();
-                        goto_xy(17, 17);
-                        cout << "=▶";
-                        if (move == ENTER) {
-                            chat = false;
-                            flag = false;
-                        }
-                        else if (move == ESC) {
-                            chat = false;
-                            log = true;
-                            num = CHAT_IN;
-                            break;
-                        }
-                        break;
-                    default:
-                        break;
-                    }
+                else if (move == ESC) {
+                    login_menu(id);
+                    goto_xy(17, 15);
+                    cout << "=▶";
                 }
-            }
-
-            if (num == ALL_CHAT) {
-                clear_screen();
-                chatting_room1();
-            }
-            else if (num == ADULT_CHAT) {
-                Sleep(1000);
-                clear_screen();
-                chatting_room2();
-                //  inWordChain = true;
-            }
-            else if (num == GAME) {
-                clear_screen();
-                cout << "아직 없는 기능입니다...";
-                // inWordChain = true;
+                break;
+            default:
+                break;
             }
         }
+
+        if (!code && chat) {
+            num = ALL_CHAT;
+            chat_menu();
+            goto_xy(17, 13);
+            cout << "=▶";
+        }
+        while (chat) {
+            move = _getch();
+            if (move == DOWN) {
+                ++num;
+                if (num > GAME) {
+                    num = ALL_CHAT;
+                }
+            }
+            else if (move == UP) {
+                --num;
+                if (num < ALL_CHAT) {
+                    num = GAME;
+                }
+            }
+            else if (move == ESC) {
+                chat = false;
+                menu = true;
+                num = CHAT_IN;
+                break;
+            }
+            switch (num) {
+            case ALL_CHAT:
+                chat_menu();
+                goto_xy(17, 13);
+                cout << "=▶";
+                if (move == ENTER) {
+                    chat = false;
+                    menu = false;
+                }
+                else if (move == ESC) {
+                    chat = false;
+                    menu = true;
+                    num = CHAT_IN;
+                    break;
+                }
+                break;
+            case ADULT_CHAT:
+                chat_menu();
+                goto_xy(17, 15);
+                cout << "=▶";
+                if (move == ENTER) {
+                    if (check_birth(id) < 0) {
+                        chat = false;
+                        menu = false;
+                    }
+                    else {
+                        chat = false;
+                        menu = true;
+                        num = CHAT_IN;
+                        break;
+                    }
+                }
+                else if (move == ESC) {
+                    chat = false;
+                    menu = true;
+                    num = CHAT_IN;
+                    break;
+                }
+                break;
+            case GAME:
+                chat_menu();
+                goto_xy(17, 17);
+                cout << "=▶";
+                if (move == ENTER) {
+                    chat = false;
+                    menu = false;
+                }
+                else if (move == ESC) {
+                    chat = false;
+                    menu = true;
+                    num = CHAT_IN;
+                    break;
+                }
+                break;
+            default:
+                break;
+            }
+        }
+
+        if (num == ALL_CHAT) {
+            clear_screen();
+            chatting_room1();
+        }
+        else if (num == ADULT_CHAT) {
+            Sleep(1000);
+            clear_screen();
+            chatting_room2();
+        }
+        else if (num == GAME) {
+            clear_screen();
+            cout << "아직 없는 기능입니다...";
+        }
     }
-    //th2.join();
     closesocket(client_sock);
     WSACleanup();
 }
