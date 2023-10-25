@@ -184,6 +184,7 @@ void add_client(int ti) {
 
     th.join();
 }
+//모두에게 메세지 보내기
 void send_msg_all(const char* msg) {
     string text = msg;
     int count = 0;
@@ -191,10 +192,11 @@ void send_msg_all(const char* msg) {
         send(sck_list[i].sck, text.c_str(), MAX_SIZE, 0);
     }
 }
+// sender 제외한 모든 client에게 메시지 전송
 void send_msg(const char* msg, string sender) {
     string text = msg;
     int count = 0;
-    for (int i = 0; i < sck_list.size(); i++) { // sender 제외한 모든 client에게 메시지 전송
+    for (int i = 0; i < sck_list.size(); i++) { 
         if (sck_list[i].user != sender) {
             for (int j = 0; j < chattingroom_member.size(); j++) {
                 if (sck_list[i].user == chattingroom_member[j])
@@ -206,14 +208,16 @@ void send_msg(const char* msg, string sender) {
         }
     }
 }
+// receiver에게만 메시지 전송
 void send_private_msg(const char* msg, string receiver) {
     string text = msg;
-    for (int i = 0; i < sck_list.size(); i++) { // receiver에게만 client에게 메시지 전송
+    for (int i = 0; i < sck_list.size(); i++) {
         if (sck_list[i].user == receiver) {
             send(sck_list[i].sck, text.c_str(), MAX_SIZE, 0);
         }
     }
 }
+// 성인채팅방에 메세지 전송
 void send_adult_msg(const char* msg, string sender) {
     string text = msg;
     for (int i = 0; i < sck_list.size(); i++) { // sender에게만 client에게 메시지 전송
@@ -277,6 +281,7 @@ void recv_msg(string user) {
             std::stringstream buf2(msg.c_str());
             string first, id, p_msg;
             buf2 >> first >> id;
+            //게임 1등 정보 가져오기
             stmt = con->createStatement();
             result = stmt->executeQuery("SELECT id, score FROM game_rank order by score desc limit 1");
             if(result->next()) {
@@ -323,9 +328,11 @@ void recv_msg(string user) {
                 cout <<"[공지] " + user + " 님이 성인채팅방에서 퇴장했습니다." << endl;
                 send_adult_msg(msg.c_str(), user);
             }
+            //욕설 사용
             if (msg.find("-") != string::npos) {
                 if_badwords(sck_info, msg.c_str());
             }
+            //귓속말 채팅
             for (int i = 0; i < sck_list.size(); i++) {
                 if (id == sck_list[i].user && first == "/w") {
                     num = 1;
@@ -355,12 +362,14 @@ void recv_msg(string user) {
                     send_private_msg(msg.c_str(), id);
                 }
             }
+            //성인채팅방에 메세지 보내기
             if (msg.find("*") != string::npos && num == 0) {
                 msg.resize(msg.size() - 1);
                 msg = nickname + " : " + msg;
                 cout << msg << endl;
                 send_adult_msg(msg.c_str(), nickname);
             }
+            //채팅 저장
             else if (num == 0 && msg.find("[공지]") == string::npos) {
                 if (_localtime64_s(&timeinfo, &temp) == 0) {
                     // 현지 시간 정보를 성공적으로 얻었습니다.
