@@ -92,525 +92,50 @@ const string username = "root"; // 데이터베이스 사용자
 const string password = "1234"; // 데이터베이스 접속 비밀번호
 
 // 화면 초기화
-void clear_screen() {
-    HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
-    COORD coordScreen = { 0, 0 };  // 화면 좌상단 좌표
-    DWORD cCharsWritten;
-    CONSOLE_SCREEN_BUFFER_INFO csbi;
-    DWORD dwConSize;
-
-    // 콘솔 화면 크기 가져오기
-    if (!GetConsoleScreenBufferInfo(hConsole, &csbi)) {
-        return;
-    }
-
-    dwConSize = csbi.dwSize.X * csbi.dwSize.Y;
-
-    // 화면을 공백 문자로 지우기
-    if (!FillConsoleOutputCharacter(hConsole, (TCHAR)' ', dwConSize, coordScreen, &cCharsWritten)) {
-        return;
-    }
-
-    // 커서 위치 초기화
-    SetConsoleCursorPosition(hConsole, coordScreen);
-}
+void clear_screen();
 // 커서 깜빡임 제거
-void cursor_view(bool show) {
-    HANDLE hConsole;
-    CONSOLE_CURSOR_INFO ConsoleCursor;
-    hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
-    ConsoleCursor.bVisible = show;
-    ConsoleCursor.dwSize = 1;
-    SetConsoleCursorInfo(hConsole, &ConsoleCursor);
-}
+void cursor_view(bool show);
 // 커서 이동 함수
-void goto_xy(int x, int y) {
-    COORD posXY = { x,y };
-    SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), posXY);
-}
+void goto_xy(int x, int y);
 // 색깔 변경 함수
-void textcolor(int foreground, int background) {
-    int color = foreground + background * 16;
-    SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), color);
-}
-
+void textcolor(int foreground, int background);
 // 인터페이스
-void start_menu()
-{
-    clear_screen();
-    cursor_view(false);
-    cout << "\n";
-    cout << " "; cout << "********************************************************\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*       * * * *   *     *       *      * * * * *       *\n";
-    cout << " "; cout << "*       *         *     *      * *         *           *\n";
-    cout << " "; cout << "*       *         * * * *     * * *        *           *\n";
-    cout << " "; cout << "*       *         *     *    *     *       *           *\n";
-    cout << " "; cout << "*       * * * *   *     *   *       *      *           *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                    < 시작 화면 >                     *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                    1. 로그인                         *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                    2. 회원가입                       *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                    0. 종료                           *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "********************************************************\n\n";
+void start_menu();
+void end_menu();
+void login_inter();
+void sign_inter();
+void login_menu(string& id);
+void info_menu();
+void info_inter();
+void pw_inter();
+void change_inter();
+void logout_menu();
+void chat_menu();
+void adult_menu();
+void adultY_inter();
+void adultN_inter();
+void game_menu();
+void game_rule();
+void game_rank_inter();
+void game_out_inter();
+void game_inter();
+// 서버 연결
+void server_connect(){
+    client_sock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
+    // 연결할 서버 정보 설정 부분
+    SOCKADDR_IN client_addr = {};
+    client_addr.sin_family = AF_INET;
+    client_addr.sin_port = htons(7777);
+    InetPton(AF_INET, TEXT("127.0.0.1"), &client_addr.sin_addr);
+    while (1) {
+        if (!connect(client_sock, (SOCKADDR*)&client_addr, sizeof(client_addr))) { // 위에 설정한 정보에 해당하는 server로 연결!
+            cout << "Server Connect" << endl;
+            break;
+        }
+        else
+            cout << "Connecting..." << endl;
+    }
 }
-void end_menu()
-{
-    clear_screen();
-    cursor_view(false);
-    cout << "\n";
-    cout << " "; cout << "********************************************************\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*       * * * *   *     *       *      * * * * *       *\n";
-    cout << " "; cout << "*       *         *     *      * *         *           *\n";
-    cout << " "; cout << "*       *         * * * *     * * *        *           *\n";
-    cout << " "; cout << "*       *         *     *    *     *       *           *\n";
-    cout << " "; cout << "*       * * * *   *     *   *       *      *           *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                    <   종 료   >                     *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*           =▶  프로그램을 종료하시겠습니까?           *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                [ENTER를 누르면 종료]                 *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "********************************************************\n\n";
-}
-void login_inter()
-{
-    cursor_view(true);
-    cout << "\n";
-    cout << " "; cout << "********************************************************\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*       * * * *   *     *       *      * * * * *       *\n";
-    cout << " "; cout << "*       *         *     *      * *         *           *\n";
-    cout << " "; cout << "*       *         * * * *     * * *        *           *\n";
-    cout << " "; cout << "*       *         *     *    *     *       *           *\n";
-    cout << " "; cout << "*       * * * *   *     *   *       *      *           *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                    <  로 그 인  >                    *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*    아이디 :                                          *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*    비밀번호 :                                        *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*             [ESC를 누르면 시작화면으로]              *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "********************************************************\n\n";
-}
-void sign_inter()
-{
-    cursor_view(true);
-    cout << "\n";
-    cout << " "; cout << "********************************************************\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                   < 회 원 가 입 >                    *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*    이 름 :                                           *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*    아이디 :                                          *\n";
-    cout << " "; cout << "*            (영문과 숫자 포함 8자리로 입력)           *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*    비밀번호 :                                        *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*    생년월일 :                                        *\n";
-    cout << " "; cout << "*             (YYYY-MM-DD로 입력)                      *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*             [ESC를 누르면 시작화면으로]              *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "********************************************************\n\n";
-}
-void login_menu(string& id)
-{
-    clear_screen();
-    cursor_view(false);
-    cout << "\n";
-    cout << " "; cout << "********************************************************\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*       * * * *   *     *       *      * * * * *       *\n";
-    cout << " "; cout << "*       *         *     *      * *         *           *\n";
-    cout << " "; cout << "*       *         * * * *     * * *        *           *\n";
-    cout << " "; cout << "*       *         *     *    *     *       *           *\n";
-    cout << " "; cout << "*       * * * *   *     *   *       *      *           *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                 " << id << "님 환영합니다!               *\n";
-    cout << " "; cout << "*                    <   메 뉴   >                     *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                    1. 채팅방 입장                    *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                    2. 마이페이지                     *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                    0. 로그아웃                       *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "********************************************************\n\n";
-}
-void info_menu()
-{
-    clear_screen();
-    cursor_view(false);
-    cout << "\n";
-    cout << " "; cout << "********************************************************\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*       * * * *   *     *       *      * * * * *       *\n";
-    cout << " "; cout << "*       *         *     *      * *         *           *\n";
-    cout << " "; cout << "*       *         * * * *     * * *        *           *\n";
-    cout << " "; cout << "*       *         *     *    *     *       *           *\n";
-    cout << " "; cout << "*       * * * *   *     *   *       *      *           *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                   <  마이페이지  >                   *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                   1. 회원정보 확인                   *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                   2. 회원정보 수정                   *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "********************************************************\n\n";
-}
-void info_inter()
-{
-    clear_screen();
-    cursor_view(false);
-    cout << "\n";
-    cout << " "; cout << "********************************************************\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                     < 회 원 정 보  >                 *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*    이 름 :                                           *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*    아이디 :                                          *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*    생년월일 :                                        *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*    랭킹 :                                            *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*             [ESC를 누르면 이전화면으로]              *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "********************************************************\n\n";
-}
-void pw_inter()
-{
-    clear_screen();
-    cursor_view(true);
-    cout << "\n";
-    cout << " "; cout << "********************************************************\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                < 회 원 정 보 수 정 >                 *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*            ※ 비밀번호를 입력해주세요 !               *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*    비밀번호 :                                        *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*             [ESC를 누르면 이전화면으로]              *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "********************************************************\n\n";
-}
-void change_inter()
-{
-    clear_screen();
-    cursor_view(true);
-    cout << "\n";
-    cout << " "; cout << "********************************************************\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                < 회 원 정 보 수 정 >                 *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*    이 름 :                                           *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*    아이디 :                                          *\n";
-    cout << " "; cout << "*            (영문과 숫자 포함 8자리로 입력)           *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*    비밀번호 :                                        *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*    생년월일 :                                        *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*             [ESC를 누르면 이전화면으로]              *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "********************************************************\n\n";
-}
-void logout_menu()
-{
-    clear_screen();
-    cursor_view(false);
-    cout << "\n";
-    cout << " "; cout << "********************************************************\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*       * * * *   *     *       *      * * * * *       *\n";
-    cout << " "; cout << "*       *         *     *      * *         *           *\n";
-    cout << " "; cout << "*       *         * * * *     * * *        *           *\n";
-    cout << " "; cout << "*       *         *     *    *     *       *           *\n";
-    cout << " "; cout << "*       * * * *   *     *   *       *      *           *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                    < 로그아웃 >                      *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*           =▶  로그아웃 하시겠습니까?                 *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*               [ENTER를 누르면 로그아웃]              *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "********************************************************\n\n";
-}
-void chat_menu()
-{
-    clear_screen();
-    cursor_view(false);
-    cout << "\n";
-    cout << " "; cout << "********************************************************\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*       * * * *   *     *       *      * * * * *       *\n";
-    cout << " "; cout << "*       *         *     *      * *         *           *\n";
-    cout << " "; cout << "*       *         * * * *     * * *        *           *\n";
-    cout << " "; cout << "*       *         *     *    *     *       *           *\n";
-    cout << " "; cout << "*       * * * *   *     *   *       *      *           *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                    < 채팅방 입장 >                   *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                    1. 전체 채팅방                    *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                    2. 성인 채팅방                    *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                    3. 타자치기 게임방                *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "********************************************************\n\n";
-}
-void adult_menu()
-{
-    clear_screen();
-    cursor_view(false);
-    cout << "\n";
-    cout << " "; cout << "********************************************************\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*       * * * *   *     *       *      * * * * *       *\n";
-    cout << " "; cout << "*       *         *     *      * *         *           *\n";
-    cout << " "; cout << "*       *         * * * *     * * *        *           *\n";
-    cout << " "; cout << "*       *         *     *    *     *       *           *\n";
-    cout << " "; cout << "*       * * * *   *     *   *       *      *           *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                   < 성인 확인 중 >                   *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*           =▶  잠시만 기다려주세요 . . .              *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "********************************************************\n\n";
-}
-void adultY_inter()
-{
-    clear_screen();
-    cursor_view(false);
-    cout << "\n";
-    cout << " "; cout << "********************************************************\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*       * * * *   *     *       *      * * * * *       *\n";
-    cout << " "; cout << "*       *         *     *      * *         *           *\n";
-    cout << " "; cout << "*       *         * * * *     * * *        *           *\n";
-    cout << " "; cout << "*       *         *     *    *     *       *           *\n";
-    cout << " "; cout << "*       * * * *   *     *   *       *      *           *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*            *          *      * * * *                 *\n";
-    cout << " "; cout << "*            *          *      *     *                 *\n";
-    cout << " "; cout << "*      *  *  *  *  *    *      * * * *                 *\n";
-    cout << " "; cout << "*            *          *            *                 *\n";
-    cout << " "; cout << "*            *          *      * * * *                 *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*             <  성인 채팅방 입장 중  >                *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "********************************************************\n\n";
-}
-void adultN_inter()
-{
-    clear_screen();
-    cursor_view(false);
-    cout << "\n";
-    cout << " "; cout << "********************************************************\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*       * * * *   *     *       *      * * * * *       *\n";
-    cout << " "; cout << "*       *         *     *      * *         *           *\n";
-    cout << " "; cout << "*       *         * * * *     * * *        *           *\n";
-    cout << " "; cout << "*       *         *     *    *     *       *           *\n";
-    cout << " "; cout << "*       * * * *   *     *   *       *      *           *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                 < 성인 확인 완료 >                   *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*              =▶  성인이 아닙니다 !                   *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "*                                                      *\n";
-    cout << " "; cout << "********************************************************\n\n";
-}
-void game_menu()
-{
-    clear_screen();
-    cursor_view(false);
-    cout << "\n";
-    cout << " "; cout << "*****************************************************************\n";
-    cout << " "; cout << "*                                                               *\n";
-    cout << " "; cout << "*       * * * *         *         *         *     * * * *       *\n";
-    cout << " "; cout << "*       *              * *        * *     * *     *             *\n";
-    cout << " "; cout << "*       *   * *       * * *       *  *   *  *     * * * *       *\n";
-    cout << " "; cout << "*       *     *      *     *      *   * *   *     *             *\n";
-    cout << " "; cout << "*       * * * *     *       *     *    *    *     * * * *       *\n";
-    cout << " "; cout << "*                                                               *\n";
-    cout << " "; cout << "*                                                               *\n";
-    cout << " "; cout << "*                                                               *\n";
-    cout << " "; cout << "*                         1. 게임 시작                          *\n";
-    cout << " "; cout << "*                                                               *\n";
-    cout << " "; cout << "*                         2. 게임 룰 소개                       *\n";
-    cout << " "; cout << "*                                                               *\n";
-    cout << " "; cout << "*                         3. 랭킹 보기                          *\n";
-    cout << " "; cout << "*                                                               *\n";
-    cout << " "; cout << "*                         4. 게임 종료                          *\n";
-    cout << " "; cout << "*                                                               *\n";
-    cout << " "; cout << "*****************************************************************\n\n";
-}
-void game_rule()
-{
-    clear_screen();
-    cursor_view(false);
-    cout << "\n";
-    cout << " "; cout << "*****************************************************************\n";
-    cout << " "; cout << "*                                                               *\n";
-    cout << " "; cout << "*       * * * *         *         *         *     * * * *       *\n";
-    cout << " "; cout << "*       *              * *        * *     * *     *             *\n";
-    cout << " "; cout << "*       *   * *       * * *       *  *   *  *     * * * *       *\n";
-    cout << " "; cout << "*       *     *      *     *      *   * *   *     *             *\n";
-    cout << " "; cout << "*       * * * *     *       *     *    *    *     * * * *       *\n";
-    cout << " "; cout << "*                                                               *\n";
-    cout << " "; cout << "*       =▶ 타자 치기 게임이란 . . .                             *\n";
-    cout << " "; cout << "*                                                               *\n";
-    cout << " "; cout << "*      30초 동안 콘솔창 화면에 제시되는 단어를 똑같이 입력하면  *\n";
-    cout << " "; cout << "*                                                               *\n";
-    cout << " "; cout << "*      성공 아니면 실패로 제한시간 내에 얼마나 많은 단어를      *\n";
-    cout << " "; cout << "*                                                               *\n";
-    cout << " "; cout << "*      입력하는지를 겨루는 순발력 게임입니다 !                  *\n";
-    cout << " "; cout << "*                                                               *\n";
-    cout << " "; cout << "*                 [ ESC를 눌러 이전화면으로 ]                   *\n";
-    cout << " "; cout << "*                                                               *\n";
-    cout << " "; cout << "*****************************************************************\n\n";
-}
-void game_rank_inter() {
-    clear_screen();
-    cursor_view(false);
-    cout << "\n";
-    cout << " "; cout << "*****************************************************************\n";
-    cout << " "; cout << "*                                                               *\n";
-    cout << " "; cout << "*                         <  랭  킹 >                           *\n";
-    cout << " "; cout << "*                                                               *\n";
-    cout << " "; cout << "*         순위     아 이 디                   점 수             *\n";
-    cout << " "; cout << "*****************************************************************\n";
-    cout << " "; cout << "*                                                               *\n";
-    cout << " "; cout << "*****************************************************************\n";
-    cout << " "; cout << "*                                                               *\n";
-    cout << " "; cout << "*                                                               *\n";
-    cout << " "; cout << "*                                                               *\n";
-    cout << " "; cout << "*                                                               *\n";
-    cout << " "; cout << "*                                                               *\n";
-    cout << " "; cout << "*                                                               *\n";
-    cout << " "; cout << "*                                                               *\n";
-    cout << " "; cout << "*                                                               *\n";
-    cout << " "; cout << "*                                                               *\n";
-    cout << " "; cout << "*****************************************************************\n";
-    cout << " "; cout << "*     [ 내 랭킹 ]                                               *\n";
-    cout << " "; cout << "*                                                               *\n";
-    cout << " "; cout << "*                                                               *\n";
-    cout << " "; cout << "*****************************************************************\n\n";
-}
-void game_out_inter()
-{
-    clear_screen();
-    cursor_view(false);
-    cout << "\n";
-    cout << " "; cout << "*****************************************************************\n";
-    cout << " "; cout << "*                                                               *\n";
-    cout << " "; cout << "*       * * * *         *         *         *     * * * *       *\n";
-    cout << " "; cout << "*       *              * *        * *     * *     *             *\n";
-    cout << " "; cout << "*       *   * *       * * *       *  *   *  *     * * * *       *\n";
-    cout << " "; cout << "*       *     *      *     *      *   * *   *     *             *\n";
-    cout << " "; cout << "*       * * * *     *       *     *    *    *     * * * *       *\n";
-    cout << " "; cout << "*                                                               *\n";
-    cout << " "; cout << "*                                                               *\n";
-    cout << " "; cout << "*                          <   종 료   >                        *\n";
-    cout << " "; cout << "*                                                               *\n";
-    cout << " "; cout << "*                                                               *\n";
-    cout << " "; cout << "*               =▶  게임을 종료하시겠습니까 ?                   *\n";
-    cout << " "; cout << "*                                                               *\n";
-    cout << " "; cout << "*                     [ ENTER를 누르면 종료 ]                   *\n";
-    cout << " "; cout << "*                                                               *\n";
-    cout << " "; cout << "*                                                               *\n";
-    cout << " "; cout << "*                                                               *\n";
-    cout << " "; cout << "*****************************************************************\n\n";
-}
-void game_inter()
-{
-    clear_screen();
-    cursor_view(true);
-    cout << "\n";
-    cout << " "; cout << "*****************************************************************\n";
-    cout << " "; cout << "*                                                               *\n";
-    cout << " "; cout << "*       * * * *         *         *         *     * * * *       *\n";
-    cout << " "; cout << "*       *              * *        * *     * *     *             *\n";
-    cout << " "; cout << "*       *   * *       * * *       *  *   *  *     * * * *       *\n";
-    cout << " "; cout << "*       *     *      *     *      *   * *   *     *             *\n";
-    cout << " "; cout << "*       * * * *     *       *     *    *    *     * * * *       *\n";
-    cout << " "; cout << "*                                                               *\n";
-    cout << " "; cout << "*****************************************************************\n";
-    cout << " "; cout << "*      제시어 :                                                 *\n";
-    cout << " "; cout << "*****************************************************************\n";
-    cout << " "; cout << "*            →                                                  *\n";
-    cout << " "; cout << "*****************************************************************\n";
-    cout << " "; cout << "*                                                               *\n";
-    cout << " "; cout << "*****************************************************************\n";
-    cout << " "; cout << "*   현재 스코어 :           점                                  *\n";
-    cout << " "; cout << "*                                                               *\n";
-    cout << " "; cout << "*                                 경과시간 :          / 30 초   *\n";
-    cout << " "; cout << "*****************************************************************\n\n";
-}
-
 // start SQL
 void start_sql()
 {
@@ -707,6 +232,8 @@ int check_id(string id_input, string& id_output) {
             cout << "※ 경고 : 잘못된 형식입니다 !";
             continue;
         }
+        // id server에 send
+        send
         pstmt = con->prepareStatement("SELECT id FROM userinfo WHERE id = ?");
         pstmt->setString(1, id_input);
         result = pstmt->executeQuery();
@@ -752,6 +279,7 @@ int check_birth(string c_id) {
 }
 // 회원가입
 void sign_in() {
+    server_connect();
     name = "";
     pw = "";
     string sign_id = "";
@@ -1274,21 +802,7 @@ void send_msg_adult() {
 }
 // 전체 채팅방
 void chatting_room1() {
-    client_sock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
-    // 연결할 서버 정보 설정 부분
-    SOCKADDR_IN client_addr = {};
-    client_addr.sin_family = AF_INET;
-    client_addr.sin_port = htons(7777);
-    InetPton(AF_INET, TEXT("127.0.0.1"), &client_addr.sin_addr);
-    while (1) {
-        if (!connect(client_sock, (SOCKADDR*)&client_addr, sizeof(client_addr))) { // 위에 설정한 정보에 해당하는 server로 연결!
-            cout << "Server Connect" << endl;
-            break;
-        }
-        else
-            cout << "Connecting..." << endl;
-    }
-
+    server_connect();
     cursor_view(true);
     std::vector<string>recent_msg;
     cout << "전체채팅방에 입장합니다!" << endl;
@@ -1333,20 +847,7 @@ void chatting_room1() {
 }
 //성인 채팅방
 void chatting_room2() {
-    client_sock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
-    // 연결할 서버 정보 설정 부분
-    SOCKADDR_IN client_addr = {};
-    client_addr.sin_family = AF_INET;
-    client_addr.sin_port = htons(7777);
-    InetPton(AF_INET, TEXT("127.0.0.1"), &client_addr.sin_addr);
-    while (1) {
-        if (!connect(client_sock, (SOCKADDR*)&client_addr, sizeof(client_addr))) { // 위에 설정한 정보에 해당하는 server로 연결!
-            cout << "Server Connect" << endl;
-            break;
-        }
-        else
-            cout << "Connecting..." << endl;
-    }
+    server_connect();
     cursor_view(true);
     cout << "성인 채팅방에 입장합니다 ! " << endl;
     string chatting_room2_id;
@@ -1444,20 +945,7 @@ void game_rank() {
 }
 // 타자치기 게임방
 void game_room() {
-    client_sock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
-    // 연결할 서버 정보 설정 부분
-    SOCKADDR_IN client_addr = {};
-    client_addr.sin_family = AF_INET;
-    client_addr.sin_port = htons(7777);
-    InetPton(AF_INET, TEXT("127.0.0.1"), &client_addr.sin_addr);
-    while (1) {
-        if (!connect(client_sock, (SOCKADDR*)&client_addr, sizeof(client_addr))) { // 위에 설정한 정보에 해당하는 server로 연결!
-            cout << "Server Connect" << endl;
-            break;
-        }
-        else
-            cout << "Connecting..." << endl;
-    }
+    server_connect();
     string game_id = id + "#";
     send(client_sock, game_id.c_str(), 9, 0);
 
@@ -1543,6 +1031,7 @@ void game_room() {
 }
 
 int main() {
+
     bool interFace = true;
     WSADATA wsa;
     start_sql();
@@ -1914,7 +1403,6 @@ int main() {
             }
         }
     }
-
     closesocket(client_sock);
     WSACleanup();
 }
